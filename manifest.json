@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "chrome stream layout",
+  "description": "Arrange 2, 3, or 4 stream sources in one full-window Chrome tab.",
+  "version": "0.1.0",
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "action": {
+    "default_title": "Open chrome stream layout",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "permissions": [
+    "declarativeNetRequestWithHostAccess",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' http: https: data: blob:; media-src 'self' http: https: data: blob:;"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/frame-helper.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "frame_headers",
+        "enabled": true,
+        "path": "rules/frame_headers.json"
+      }
+    ]
+  }
+}

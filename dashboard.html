@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>chrome stream layout</title>
+    <link rel="stylesheet" href="src/dashboard.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage layout-4" id="stage" aria-label="chrome stream layout"></section>
+    </main>
+
+    <div class="floating-toolbar" aria-label="Toolbar">
+      <button class="icon-button" id="openControlsButton" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path>
+          <path d="M2 14h4M10 8h4M18 16h4"></path>
+        </svg>
+      </button>
+
+      <button class="icon-button" id="reloadAllButton" type="button" title="Reload all" aria-label="Reload all">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 12a9 9 0 0 1-15.4 6.4M3 12A9 9 0 0 1 18.4 5.6"></path>
+          <path d="M18 2v4h4M6 22v-4H2"></path>
+        </svg>
+      </button>
+
+      <button class="icon-button" id="fullscreenButton" type="button" title="Browser fullscreen" aria-label="Browser fullscreen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="control-overlay" id="controlOverlay" hidden>
+      <section class="control-dialog" role="dialog" aria-modal="true" aria-labelledby="controlsTitle">
+        <form class="stream-form" id="streamForm">
+          <div class="dialog-head">
+            <div>
+              <h1 id="controlsTitle">chrome stream layout</h1>
+              <p>Sources and layout</p>
+            </div>
+            <button class="icon-button" id="closeControlsButton" type="button" title="Close" aria-label="Close">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="layout-switch" role="radiogroup" aria-label="Pane count">
+            <button class="segment" type="button" data-layout="2" aria-pressed="false">2</button>
+            <button class="segment" type="button" data-layout="3" aria-pressed="false">3</button>
+            <button class="segment" type="button" data-layout="4" aria-pressed="false">4</button>
+          </div>
+
+          <div class="slot-controls" id="slotControls"></div>
+
+          <div class="form-actions">
+            <span id="saveStatus" aria-live="polite"></span>
+            <button class="secondary-button" id="clearButton" type="button">Clear</button>
+            <button class="primary-button" type="submit">Apply</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script src="src/dashboard.js"></script>
+  </body>
+</html>
