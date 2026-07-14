@@ -29,25 +29,5 @@
         "sub_frame"
       ]
     }
-  },
-  {
-    "id": 2,
-    "priority": 2,
-    "action": {
-      "type": "modifyHeaders",
-      "requestHeaders": [
-        {
-          "header": "referer",
-          "operation": "set",
-          "value": "https://chrome-stream-layout.local/"
-        }
-      ]
-    },
-    "condition": {
-      "regexFilter": "^https://(www\\.)?youtube(-nocookie)?\\.com/embed/",
-      "resourceTypes": [
-        "sub_frame"
-      ]
-    }
   }
 ]

@@ -22,6 +22,7 @@
     "service_worker": "src/background.js"
   },
   "permissions": [
+    "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
     "storage",
     "tabs"
@@ -35,8 +36,16 @@
   "content_scripts": [
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "*://youtube.com/*",
+        "*://*.youtube.com/*",
+        "*://youtube-nocookie.com/*",
+        "*://*.youtube-nocookie.com/*",
+        "*://yes2049.com/*",
+        "*://*.yes2049.com/*",
+        "*://yeslivetv.com/*",
+        "*://*.yeslivetv.com/*",
+        "*://welife6.com/*",
+        "*://*.welife6.com/*"
       ],
       "js": [
         "src/frame-helper.js"
@@ -44,14 +53,5 @@
       "all_frames": true,
       "run_at": "document_idle"
     }
-  ],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "frame_headers",
-        "enabled": true,
-        "path": "rules/frame_headers.json"
-      }
-    ]
-  }
+  ]
 }
