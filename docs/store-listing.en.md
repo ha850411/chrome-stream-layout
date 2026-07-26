@@ -2,7 +2,7 @@
 
 ## Name
 
-Chrome Stream Layout
+Stream Layout
 
 ## Summary
 
@@ -10,7 +10,7 @@ Arrange 2, 3, or 4 stream and video sources in one Chrome tab with resizable pan
 
 ## Detailed description
 
-Chrome Stream Layout lets you watch 2, 3, or 4 stream and video sources together in one full-window tab. Paste your source URLs, choose a layout, and apply it to create a focused multi-view workspace.
+Stream Layout lets you watch 2, 3, or 4 stream and video sources together in one full-window tab. Paste your source URLs, choose a layout, and apply it to create a focused multi-view workspace.
 
 Key features:
 

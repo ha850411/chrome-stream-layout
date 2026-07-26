@@ -1,4 +1,4 @@
-"""Generate Chrome Web Store listing artwork for chrome stream layout.
+"""Generate Chrome Web Store listing artwork for Stream Layout.
 
 The artwork is deliberately rendered from simple shapes and the extension's
 real icon so that it stays reproducible and does not imply support for a
@@ -188,7 +188,7 @@ def stage_image(size, layout=4, with_toolbar=True, accent_split=False):
     return image
 
 
-def window_frame(canvas, box, stage, title="chrome stream layout"):
+def window_frame(canvas, box, stage, title="Stream Layout"):
     x1, y1, x2, y2 = box
     layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
@@ -248,7 +248,7 @@ def screenshot_base(locale, title, subtitle):
     canvas = gradient((1280, 800), "#111815", "#050706").convert("RGBA")
     canvas = glow(canvas, (1020, 150), 310, opacity=90)
     draw = ImageDraw.Draw(canvas, "RGBA")
-    add_text(draw, (70, 64), "chrome stream layout", 19, COLORS["accent_bright"], bold=True)
+    add_text(draw, (70, 64), "Stream Layout", 19, COLORS["accent_bright"], bold=True)
     add_text(draw, (70, 106), title, 47 if not cjk else 44, COLORS["text"], bold=True, cjk=cjk)
     add_text(draw, (72, 171), subtitle, 21, COLORS["muted"], cjk=cjk)
     return canvas
@@ -286,7 +286,7 @@ def screenshot_controls(locale):
     overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay, "RGBA")
     od.rounded_rectangle((755, 270, 1175, 738), 16, fill=(24, 24, 22, 248), outline=(255, 255, 255, 50), width=1)
-    add_text(od, (785, 298), "chrome stream layout", 18, COLORS["text"], bold=True)
+    add_text(od, (785, 298), "Stream Layout", 18, COLORS["text"], bold=True)
     add_text(od, (785, 327), copy["sources"], 13, COLORS["muted"], cjk=cjk)
     add_text(od, (785, 367), copy["language"], 12, COLORS["muted"], bold=True, cjk=cjk)
     language_names = ("繁體中文", "English")
@@ -332,11 +332,11 @@ def promo_marquee():
     canvas = glow(canvas, (180, 280), 300, opacity=55)
     draw = ImageDraw.Draw(canvas, "RGBA")
     draw_icon(canvas, (80, 120, 320, 360))
-    add_text(draw, (350, 180), "chrome stream layout", 42, COLORS["text"], bold=True)
+    add_text(draw, (350, 180), "Stream Layout", 42, COLORS["text"], bold=True)
     add_text(draw, (352, 248), "Four sources. One focused tab.", 24, COLORS["accent_bright"], bold=True)
     add_text(draw, (352, 291), "Arrange live video your way.", 18, COLORS["muted"])
     preview = stage_image((560, 350), layout=4, with_toolbar=False, accent_split=True)
-    window_frame(canvas, (790, 100, 1360, 470), preview, title="chrome stream layout")
+    window_frame(canvas, (790, 100, 1360, 470), preview, title="Stream Layout")
     return canvas.convert("RGB")
 
 

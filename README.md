@@ -1,4 +1,4 @@
-# chrome stream layout
+# Stream Layout
 
 Chrome/Edge MV3 extension for watching 2, 3, or 4 video sources in one full-window tab.
 
@@ -8,7 +8,7 @@ Chrome/Edge MV3 extension for watching 2, 3, or 4 video sources in one full-wind
 2. Enable developer mode.
 3. Choose "Load unpacked".
 4. Select this folder: `chrome_layout`.
-5. Click the chrome stream layout extension icon.
+5. Click the Stream Layout extension icon.
 
 After changing `manifest.json`, reload the extension from `chrome://extensions`.
 
@@ -28,6 +28,7 @@ The extension has `<all_urls>` host access and removes common iframe-blocking re
 - Click the extension icon to open or focus the layout tab and show the source and layout dialog. If the tab is already open, the extension reuses it instead of opening another copy.
 - The video layout has no floating extension controls. Click the extension icon to open or reopen the app dialog; reload and layout-fullscreen actions are available in the dialog header.
 - Choose 2, 3, or 4 panes in the dialog.
+- The icon inside each URL field highlights where that source will appear. Drag a source card onto another card to swap their positions.
 - Choose Traditional Chinese or English for the dashboard interface. The preference is saved with the layout state.
 - Use the fullscreen button in the app dialog to put the whole layout into browser fullscreen while preserving the current 2, 3, or 4 pane arrangement.
 - Drag the thin separators between panes to resize the layout.

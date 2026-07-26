@@ -34,6 +34,16 @@ const TRANSLATIONS = {
     language: "Language",
     paneCount: "Pane count",
     pane: "Pane {number}",
+    dragSource: "Drag source {number}",
+    panePosition: "Pane {number}, {position}",
+    unusedPosition: "Not in current layout",
+    left: "Left",
+    right: "Right",
+    topLeft: "Top left",
+    topRight: "Top right",
+    bottomLeft: "Bottom left",
+    bottomRight: "Bottom right",
+    positionsSwapped: "Swapped panes {from} and {to}",
     idle: "Idle",
     clear: "Clear",
     clearPane: "Clear pane {number}",
@@ -61,6 +71,16 @@ const TRANSLATIONS = {
     language: "介面語言",
     paneCount: "窗格數量",
     pane: "窗格 {number}",
+    dragSource: "拖曳來源 {number}",
+    panePosition: "窗格 {number}，{position}",
+    unusedPosition: "目前版面不顯示",
+    left: "左側",
+    right: "右側",
+    topLeft: "左上",
+    topRight: "右上",
+    bottomLeft: "左下",
+    bottomRight: "右下",
+    positionsSwapped: "已交換窗格 {from} 與 {to}",
     idle: "未使用",
     clear: "清除",
     clearPane: "清除窗格 {number}",
@@ -83,6 +103,7 @@ const TRANSLATIONS = {
 
 const ICONS = {
   clear: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>',
+  grip: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="6" r="1"></circle><circle cx="16" cy="6" r="1"></circle><circle cx="8" cy="12" r="1"></circle><circle cx="16" cy="12" r="1"></circle><circle cx="8" cy="18" r="1"></circle><circle cx="16" cy="18" r="1"></circle></svg>',
   maximize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>',
   minimize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>'
 };
@@ -93,6 +114,7 @@ let renderToken = 0;
 let frameViewportNotifyTimer = 0;
 let frameViewportNotifyDeadline = 0;
 let frameViewportNotifyReason = "layout";
+let draggedSlotIndex = null;
 const bilibiliRoomIdCache = new Map();
 
 const stage = document.querySelector("#stage");
@@ -146,9 +168,24 @@ function bindEvents() {
     const input = slotControls.querySelector(`[data-url-input="${index}"]`);
     if (input) {
       input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
       input.focus();
     }
   });
+
+  slotControls.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-url-input]");
+    if (!input) return;
+
+    const index = Number(input.dataset.urlInput);
+    state.slots[index] = { url: input.value.trim() };
+    updateSlotSourceSummary(index);
+  });
+
+  slotControls.addEventListener("dragstart", startSlotDrag);
+  slotControls.addEventListener("dragover", continueSlotDrag);
+  slotControls.addEventListener("drop", finishSlotDrop);
+  slotControls.addEventListener("dragend", endSlotDrag);
 
   clearButton.addEventListener("click", () => {
     state.slots = state.slots.map(() => ({ url: "" }));
@@ -274,18 +311,33 @@ function renderControls() {
     const disabled = index >= state.layout;
     const wrapper = document.createElement("div");
     wrapper.className = `slot-control${disabled ? " is-disabled" : ""}`;
+    wrapper.dataset.slotTarget = String(index);
 
     const labelRow = document.createElement("div");
     labelRow.className = "slot-label-row";
+
+    const labelGroup = document.createElement("div");
+    labelGroup.className = "slot-label-group";
+
+    const dragHandle = document.createElement("button");
+    dragHandle.className = "drag-handle";
+    dragHandle.type = "button";
+    dragHandle.draggable = true;
+    dragHandle.dataset.dragSlot = String(index);
+    dragHandle.title = t("dragSource", { number: index + 1 });
+    dragHandle.setAttribute("aria-label", dragHandle.title);
+    dragHandle.innerHTML = ICONS.grip;
 
     const label = document.createElement("label");
     label.htmlFor = `slot-url-${index}`;
     label.textContent = t("pane", { number: index + 1 });
 
     const status = document.createElement("span");
-    status.textContent = disabled ? t("idle") : getSourceLabel(slot.url);
+    status.dataset.sourceSummary = String(index);
+    status.textContent = disabled ? t("idle") : getSourceLabel(slot.url) || t("noSource");
 
-    labelRow.append(label, status);
+    labelGroup.append(dragHandle, label);
+    labelRow.append(labelGroup, status);
 
     const row = document.createElement("div");
     row.className = "url-row";
@@ -298,6 +350,10 @@ function renderControls() {
     input.value = slot.url;
     input.dataset.urlInput = String(index);
 
+    const inputShell = document.createElement("div");
+    inputShell.className = "url-input-shell";
+    inputShell.append(createPaneLocationIcon(index), input);
+
     const clearSlotButton = document.createElement("button");
     clearSlotButton.className = "mini-button";
     clearSlotButton.type = "button";
@@ -306,7 +362,7 @@ function renderControls() {
     clearSlotButton.dataset.clearSlot = String(index);
     clearSlotButton.innerHTML = ICONS.clear;
 
-    row.append(input, clearSlotButton);
+    row.append(inputShell, clearSlotButton);
     wrapper.append(labelRow, row);
     slotControls.append(wrapper);
   }
@@ -322,6 +378,133 @@ function renderControls() {
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
+}
+
+function createPaneLocationIcon(index) {
+  const regionSets = {
+    2: [
+      { x: 1, y: 1, width: 14, height: 20 },
+      { x: 17, y: 1, width: 14, height: 20 }
+    ],
+    3: [
+      { x: 1, y: 1, width: 18, height: 20 },
+      { x: 21, y: 1, width: 10, height: 9 },
+      { x: 21, y: 12, width: 10, height: 9 }
+    ],
+    4: [
+      { x: 1, y: 1, width: 14, height: 9 },
+      { x: 17, y: 1, width: 14, height: 9 },
+      { x: 1, y: 12, width: 14, height: 9 },
+      { x: 17, y: 12, width: 14, height: 9 }
+    ]
+  };
+  const active = index < state.layout;
+  const position = getPanePositionLabel(index);
+  const icon = document.createElement("span");
+  icon.className = `pane-location-icon${active ? "" : " is-inactive"}`;
+  icon.title = t("panePosition", { number: index + 1, position });
+  icon.setAttribute("role", "img");
+  icon.setAttribute("aria-label", icon.title);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 32 22");
+  svg.setAttribute("aria-hidden", "true");
+
+  regionSets[state.layout].forEach((region, regionIndex) => {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", String(region.x));
+    rect.setAttribute("y", String(region.y));
+    rect.setAttribute("width", String(region.width));
+    rect.setAttribute("height", String(region.height));
+    rect.setAttribute("rx", "1.5");
+    if (active && regionIndex === index) {
+      rect.classList.add("is-current");
+    }
+    svg.append(rect);
+  });
+
+  icon.append(svg);
+  return icon;
+}
+
+function getPanePositionLabel(index) {
+  const positionKeys = {
+    2: ["left", "right"],
+    3: ["left", "topRight", "bottomRight"],
+    4: ["topLeft", "topRight", "bottomLeft", "bottomRight"]
+  };
+  const key = positionKeys[state.layout]?.[index];
+  return key ? t(key) : t("unusedPosition");
+}
+
+function updateSlotSourceSummary(index) {
+  const summary = slotControls.querySelector(`[data-source-summary="${index}"]`);
+  if (summary) {
+    summary.textContent = index >= state.layout ? t("idle") : getSourceLabel(state.slots[index].url) || t("noSource");
+  }
+}
+
+function startSlotDrag(event) {
+  const source = event.target.closest("[data-drag-slot]");
+  if (!source) return;
+
+  draggedSlotIndex = Number(source.dataset.dragSlot);
+  document.body.classList.add("is-reordering");
+  slotControls.querySelector(`[data-slot-target="${draggedSlotIndex}"]`)?.classList.add("is-dragging");
+
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", String(draggedSlotIndex));
+}
+
+function continueSlotDrag(event) {
+  if (draggedSlotIndex === null) return;
+
+  const target = event.target.closest("[data-slot-target]");
+  clearSlotDropTargets();
+  if (!target || Number(target.dataset.slotTarget) === draggedSlotIndex) return;
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  const targetIndex = Number(target.dataset.slotTarget);
+  slotControls.querySelector(`[data-slot-target="${targetIndex}"]`)?.classList.add("is-drop-target");
+}
+
+function finishSlotDrop(event) {
+  const target = event.target.closest("[data-slot-target]");
+  if (!target || draggedSlotIndex === null) return;
+
+  event.preventDefault();
+  const targetIndex = Number(target.dataset.slotTarget);
+  if (targetIndex === draggedSlotIndex) {
+    endSlotDrag();
+    return;
+  }
+
+  syncStateFromForm();
+  [state.slots[draggedSlotIndex], state.slots[targetIndex]] = [
+    state.slots[targetIndex],
+    state.slots[draggedSlotIndex]
+  ];
+
+  const previousIndex = draggedSlotIndex;
+  endSlotDrag();
+  renderControls();
+  void renderStage();
+  void persistState(t("positionsSwapped", {
+    from: previousIndex + 1,
+    to: targetIndex + 1
+  }));
+}
+
+function endSlotDrag() {
+  draggedSlotIndex = null;
+  document.body.classList.remove("is-reordering");
+  slotControls.querySelectorAll(".is-dragging").forEach((element) => element.classList.remove("is-dragging"));
+  clearSlotDropTargets();
+}
+
+function clearSlotDropTargets() {
+  slotControls.querySelectorAll(".is-drop-target").forEach((element) => element.classList.remove("is-drop-target"));
 }
 
 async function renderStage() {

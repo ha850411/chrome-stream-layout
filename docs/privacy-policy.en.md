@@ -1,8 +1,8 @@
-# Chrome Stream Layout Privacy Policy
+# Stream Layout Privacy Policy
 
 Effective date: July 14, 2026
 
-Chrome Stream Layout (the “Extension”) respects your privacy. This policy explains what information the Extension processes, why it is processed, and how it is stored and shared.
+Stream Layout (the “Extension”) respects your privacy. This policy explains what information the Extension processes, why it is processed, and how it is stored and shared.
 
 ## Information Collection
 

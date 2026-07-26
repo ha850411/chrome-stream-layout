@@ -1,6 +1,6 @@
 # Chrome Web Store 素材
 
-此目錄包含 Chrome Stream Layout 的中英文商店文案與可直接上傳的圖片。
+此目錄包含 Stream Layout 的中英文商店文案與可直接上傳的圖片。
 
 ## 檔案
 

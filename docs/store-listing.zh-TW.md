@@ -2,7 +2,7 @@
 
 ## 名稱
 
-Chrome Stream Layout
+Stream Layout
 
 ## 簡短說明
 
@@ -10,7 +10,7 @@ Chrome Stream Layout
 
 ## 詳細說明
 
-Chrome Stream Layout 讓你在同一個完整視窗中，同時觀看 2、3 或 4 個直播與影片來源。貼上來源網址、選擇版面並按下套用，即可建立專屬的多畫面觀看空間。
+Stream Layout 讓你在同一個完整視窗中，同時觀看 2、3 或 4 個直播與影片來源。貼上來源網址、選擇版面並按下套用，即可建立專屬的多畫面觀看空間。
 
 主要功能：
 
