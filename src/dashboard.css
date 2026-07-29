@@ -465,6 +465,7 @@ body.is-browser-fullscreen .stage {
 }
 
 .slot-control {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 11px;
@@ -472,6 +473,11 @@ body.is-browser-fullscreen .stage {
   border-radius: 8px;
   background: var(--panel-raised);
   transition: border-color 120ms ease, background 120ms ease, opacity 120ms ease, transform 120ms ease;
+  cursor: grab;
+}
+
+.slot-control:active {
+  cursor: grabbing;
 }
 
 .slot-control.is-disabled {
@@ -487,18 +493,39 @@ body.is-browser-fullscreen .stage {
 
 .slot-label-group {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
   gap: 8px;
 }
 
 .slot-label-row label {
+  flex: 0 0 auto;
   color: var(--text);
   font-size: 13px;
   font-weight: 760;
 }
 
+.slot-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-title:not(:empty)::before {
+  content: "·";
+  margin-right: 8px;
+}
+
 .slot-label-row > span {
+  flex: 0 0 auto;
+  max-width: 24%;
   overflow: hidden;
   color: var(--quiet);
   font-size: 12px;
@@ -542,6 +569,16 @@ body.is-browser-fullscreen .stage {
   transform: scale(0.98);
 }
 
+.slot-control.is-preview-swapping {
+  z-index: 2;
+  transform: translateY(var(--drag-preview-y));
+}
+
+.slot-control.is-dragging.is-preview-swapping {
+  z-index: 3;
+  transform: translateY(var(--drag-preview-y)) scale(0.98);
+}
+
 .slot-control.is-drop-target {
   border-color: var(--accent);
   background: rgba(22, 184, 166, 0.14);
@@ -567,6 +604,7 @@ body.is-reordering {
   border: 1px solid #464641;
   border-radius: 7px;
   background: #090909;
+  cursor: text;
 }
 
 .url-input-shell:focus-within {

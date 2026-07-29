@@ -21,7 +21,7 @@ const DEFAULT_STATE = {
     layout3: { col: 66, row: 50 },
     layout4: { col: 50, row: 50 }
   },
-  slots: Array.from({ length: SLOT_COUNT }, () => ({ url: "" }))
+  slots: Array.from({ length: SLOT_COUNT }, () => ({ url: "", title: "" }))
 };
 
 const TRANSLATIONS = {
@@ -115,6 +115,8 @@ let frameViewportNotifyTimer = 0;
 let frameViewportNotifyDeadline = 0;
 let frameViewportNotifyReason = "layout";
 let draggedSlotIndex = null;
+let previewSlotIndex = null;
+let dragSlotRects = [];
 const bilibiliRoomIdCache = new Map();
 
 const stage = document.querySelector("#stage");
@@ -140,10 +142,10 @@ async function init() {
   state = normalizeState(await readState());
   applyLanguage();
   renderControls();
-  await ensureFrameHeaderRules();
-  await renderStage();
   bindEvents();
   bindExternalEvents();
+  await ensureFrameHeaderRules();
+  await renderStage();
 
   if (consumeOpenControlsRequestFromUrl() || await hasRecentOpenControlsRequest()) {
     openControls();
@@ -178,8 +180,9 @@ function bindEvents() {
     if (!input) return;
 
     const index = Number(input.dataset.urlInput);
-    state.slots[index] = { url: input.value.trim() };
+    state.slots[index] = { url: input.value.trim(), title: "" };
     updateSlotSourceSummary(index);
+    updateSlotTitle(index);
   });
 
   slotControls.addEventListener("dragstart", startSlotDrag);
@@ -188,7 +191,7 @@ function bindEvents() {
   slotControls.addEventListener("dragend", endSlotDrag);
 
   clearButton.addEventListener("click", () => {
-    state.slots = state.slots.map(() => ({ url: "" }));
+    state.slots = state.slots.map(() => ({ url: "", title: "" }));
     renderControls();
     void renderStage();
     void persistState(t("cleared"));
@@ -217,6 +220,11 @@ function bindEvents() {
   window.addEventListener("message", (event) => {
     if (event.data?.type === "chrome-stream-layout:youtube-embed-error") {
       fallbackFromYouTubeEmbed(event);
+      return;
+    }
+
+    if (event.data?.type === "chrome-stream-layout:frame-title") {
+      updateTitleFromFrame(event);
     }
   });
 
@@ -312,6 +320,8 @@ function renderControls() {
     const wrapper = document.createElement("div");
     wrapper.className = `slot-control${disabled ? " is-disabled" : ""}`;
     wrapper.dataset.slotTarget = String(index);
+    wrapper.dataset.dragSlot = String(index);
+    wrapper.draggable = true;
 
     const labelRow = document.createElement("div");
     labelRow.className = "slot-label-row";
@@ -322,8 +332,7 @@ function renderControls() {
     const dragHandle = document.createElement("button");
     dragHandle.className = "drag-handle";
     dragHandle.type = "button";
-    dragHandle.draggable = true;
-    dragHandle.dataset.dragSlot = String(index);
+    dragHandle.draggable = false;
     dragHandle.title = t("dragSource", { number: index + 1 });
     dragHandle.setAttribute("aria-label", dragHandle.title);
     dragHandle.innerHTML = ICONS.grip;
@@ -332,11 +341,18 @@ function renderControls() {
     label.htmlFor = `slot-url-${index}`;
     label.textContent = t("pane", { number: index + 1 });
 
+    const title = document.createElement("span");
+    title.className = "slot-title";
+    title.dataset.slotTitle = String(index);
+    title.textContent = slot.title;
+    title.title = slot.title;
+    title.dir = "auto";
+
     const status = document.createElement("span");
     status.dataset.sourceSummary = String(index);
     status.textContent = disabled ? t("idle") : getSourceLabel(slot.url) || t("noSource");
 
-    labelGroup.append(dragHandle, label);
+    labelGroup.append(dragHandle, label, title);
     labelRow.append(labelGroup, status);
 
     const row = document.createElement("div");
@@ -444,13 +460,26 @@ function updateSlotSourceSummary(index) {
   }
 }
 
+function updateSlotTitle(index) {
+  const title = slotControls.querySelector(`[data-slot-title="${index}"]`);
+  if (!title) return;
+
+  title.textContent = state.slots[index].title;
+  title.title = state.slots[index].title;
+}
+
 function startSlotDrag(event) {
   const source = event.target.closest("[data-drag-slot]");
   if (!source) return;
 
   draggedSlotIndex = Number(source.dataset.dragSlot);
+  dragSlotRects = Array.from(slotControls.querySelectorAll("[data-slot-target]")).map((element) => ({
+    index: Number(element.dataset.slotTarget),
+    rect: element.getBoundingClientRect()
+  }));
   document.body.classList.add("is-reordering");
-  slotControls.querySelector(`[data-slot-target="${draggedSlotIndex}"]`)?.classList.add("is-dragging");
+  source.classList.add("is-dragging");
+  source.setAttribute("aria-grabbed", "true");
 
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", String(draggedSlotIndex));
@@ -459,23 +488,22 @@ function startSlotDrag(event) {
 function continueSlotDrag(event) {
   if (draggedSlotIndex === null) return;
 
-  const target = event.target.closest("[data-slot-target]");
-  clearSlotDropTargets();
-  if (!target || Number(target.dataset.slotTarget) === draggedSlotIndex) return;
-
+  const targetIndex = getDragTargetIndex(event.clientY);
+  if (targetIndex === null) {
+    clearSlotSwapPreview();
+    return;
+  }
   event.preventDefault();
   event.dataTransfer.dropEffect = "move";
-  const targetIndex = Number(target.dataset.slotTarget);
-  slotControls.querySelector(`[data-slot-target="${targetIndex}"]`)?.classList.add("is-drop-target");
+  previewSlotSwap(targetIndex);
 }
 
 function finishSlotDrop(event) {
-  const target = event.target.closest("[data-slot-target]");
-  if (!target || draggedSlotIndex === null) return;
+  if (draggedSlotIndex === null) return;
 
+  const targetIndex = previewSlotIndex ?? getDragTargetIndex(event.clientY);
   event.preventDefault();
-  const targetIndex = Number(target.dataset.slotTarget);
-  if (targetIndex === draggedSlotIndex) {
+  if (targetIndex === null || targetIndex === draggedSlotIndex) {
     endSlotDrag();
     return;
   }
@@ -489,7 +517,9 @@ function finishSlotDrop(event) {
   const previousIndex = draggedSlotIndex;
   endSlotDrag();
   renderControls();
-  void renderStage();
+  if (!swapRenderedStageTiles(previousIndex, targetIndex)) {
+    void renderStage();
+  }
   void persistState(t("positionsSwapped", {
     from: previousIndex + 1,
     to: targetIndex + 1
@@ -498,13 +528,100 @@ function finishSlotDrop(event) {
 
 function endSlotDrag() {
   draggedSlotIndex = null;
+  dragSlotRects = [];
   document.body.classList.remove("is-reordering");
-  slotControls.querySelectorAll(".is-dragging").forEach((element) => element.classList.remove("is-dragging"));
+  slotControls.querySelectorAll(".is-dragging").forEach((element) => {
+    element.classList.remove("is-dragging");
+    element.removeAttribute("aria-grabbed");
+  });
+  clearSlotSwapPreview();
+  clearSlotDropTargets();
+}
+
+function getDragTargetIndex(pointerY) {
+  if (!Number.isFinite(pointerY) || !dragSlotRects.length) {
+    return null;
+  }
+
+  const directTarget = dragSlotRects.find(({ rect }) => pointerY >= rect.top && pointerY <= rect.bottom);
+  if (directTarget) {
+    return directTarget.index;
+  }
+
+  return dragSlotRects.reduce((closest, candidate) => {
+    const distance = Math.abs(pointerY - (candidate.rect.top + candidate.rect.height / 2));
+    return !closest || distance < closest.distance ? { index: candidate.index, distance } : closest;
+  }, null)?.index ?? null;
+}
+
+function previewSlotSwap(targetIndex) {
+  if (targetIndex === previewSlotIndex) return;
+
+  clearSlotSwapPreview();
+  if (targetIndex === draggedSlotIndex) return;
+
+  const source = slotControls.querySelector(`[data-slot-target="${draggedSlotIndex}"]`);
+  const target = slotControls.querySelector(`[data-slot-target="${targetIndex}"]`);
+  const sourceRect = dragSlotRects.find((item) => item.index === draggedSlotIndex)?.rect;
+  const targetRect = dragSlotRects.find((item) => item.index === targetIndex)?.rect;
+  if (!source || !target || !sourceRect || !targetRect) return;
+
+  previewSlotIndex = targetIndex;
+  source.style.setProperty("--drag-preview-y", `${targetRect.top - sourceRect.top}px`);
+  target.style.setProperty("--drag-preview-y", `${sourceRect.top - targetRect.top}px`);
+  source.classList.add("is-preview-swapping");
+  target.classList.add("is-preview-swapping", "is-drop-target");
+}
+
+function clearSlotSwapPreview() {
+  previewSlotIndex = null;
+  slotControls.querySelectorAll(".is-preview-swapping").forEach((element) => {
+    element.classList.remove("is-preview-swapping");
+    element.style.removeProperty("--drag-preview-y");
+  });
   clearSlotDropTargets();
 }
 
 function clearSlotDropTargets() {
   slotControls.querySelectorAll(".is-drop-target").forEach((element) => element.classList.remove("is-drop-target"));
+}
+
+function swapRenderedStageTiles(fromIndex, toIndex) {
+  if (fromIndex >= state.layout || toIndex >= state.layout) {
+    return false;
+  }
+
+  const fromTile = stage.querySelector(`[data-tile="${fromIndex}"]`);
+  const toTile = stage.querySelector(`[data-tile="${toIndex}"]`);
+  if (!fromTile || !toTile) {
+    return false;
+  }
+
+  retargetStageTile(fromTile, toIndex);
+  retargetStageTile(toTile, fromIndex);
+  notifyTileFramesOfViewportChange("layout");
+  return true;
+}
+
+function retargetStageTile(tile, index) {
+  Array.from(tile.classList)
+    .filter((className) => /^tile-\d+$/.test(className))
+    .forEach((className) => tile.classList.remove(className));
+
+  tile.classList.add(`tile-${index + 1}`);
+  tile.dataset.tile = String(index);
+
+  const shell = tile.querySelector("[data-tile-frame-shell]");
+  if (shell) {
+    shell.dataset.tileFrameShell = String(index);
+  }
+
+  const iframe = tile.querySelector("iframe[data-tile-frame]");
+  if (iframe) {
+    iframe.dataset.tileFrame = String(index);
+    iframe.name = `chrome-stream-layout-pane-${index}`;
+    iframe.title = t("pane", { number: index + 1 });
+  }
 }
 
 async function renderStage() {
@@ -541,7 +658,7 @@ async function renderStage() {
       continue;
     }
 
-    tile.append(createTileFrame(index, embed));
+    tile.append(createTileFrame(index, embed, slot.url));
     stage.append(tile);
   }
 
@@ -550,7 +667,7 @@ async function renderStage() {
   observeFixedViewportShells();
 }
 
-function createTileFrame(index, embed) {
+function createTileFrame(index, embed, sourceUrl) {
   const shell = document.createElement("div");
   shell.className = "tile-frame-shell";
   shell.dataset.tileFrameShell = String(index);
@@ -569,11 +686,13 @@ function createTileFrame(index, embed) {
   iframe.title = t("pane", { number: index + 1 });
   iframe.name = `chrome-stream-layout-pane-${index}`;
   iframe.dataset.tileFrame = String(index);
+  iframe.dataset.sourceUrl = sourceUrl;
   iframe.allow = "autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share";
   iframe.allowFullscreen = true;
   iframe.loading = "eager";
   iframe.referrerPolicy = embed.referrerPolicy || "strict-origin-when-cross-origin";
   iframe.setAttribute("allowfullscreen", "true");
+  iframe.addEventListener("load", () => requestFrameTitle(iframe));
 
   if (embed.fallbackSrc) {
     iframe.dataset.fallbackSrc = embed.fallbackSrc;
@@ -605,6 +724,37 @@ function fallbackFromYouTubeEmbed(event) {
   iframe.src = fallbackSrc;
 }
 
+function updateTitleFromFrame(event) {
+  const iframe = Array.from(stage.querySelectorAll("iframe[data-tile-frame]")).find(
+    (candidate) => candidate.contentWindow === event.source
+  );
+  if (!iframe) return;
+
+  const index = Number(iframe.dataset.tileFrame);
+  const sourceUrl = iframe.dataset.sourceUrl || "";
+  if (!Number.isInteger(index) || state.slots[index]?.url !== sourceUrl) return;
+
+  const title = normalizePageTitle(event.data.title);
+  if (state.slots[index].title === title) return;
+
+  state.slots[index].title = title;
+  updateSlotTitle(index);
+}
+
+function normalizePageTitle(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
+function requestFrameTitle(iframe) {
+  iframe.contentWindow?.postMessage({
+    type: "chrome-stream-layout:request-title"
+  }, "*");
+}
+
+function requestFrameTitles() {
+  stage.querySelectorAll("iframe[data-tile-frame]").forEach(requestFrameTitle);
+}
+
 function createEmptyState(index) {
   const empty = document.createElement("div");
   empty.className = "tile-empty";
@@ -622,7 +772,11 @@ function createErrorState(message) {
 function syncStateFromForm() {
   const nextSlots = Array.from({ length: SLOT_COUNT }, (_, index) => {
     const input = slotControls.querySelector(`[data-url-input="${index}"]`);
-    return { url: input ? input.value.trim() : state.slots[index].url };
+    const url = input ? input.value.trim() : state.slots[index].url;
+    return {
+      url,
+      title: url === state.slots[index].url ? state.slots[index].title : ""
+    };
   });
 
   state = normalizeState({
@@ -635,7 +789,10 @@ function openControls() {
   renderControls();
   controlOverlay.hidden = false;
   const firstInput = slotControls.querySelector("input");
-  window.setTimeout(() => firstInput?.focus(), 0);
+  window.setTimeout(() => {
+    requestFrameTitles();
+    firstInput?.focus();
+  }, 0);
 }
 
 function closeControls() {
@@ -1141,7 +1298,8 @@ function normalizeState(input) {
   const layout = [2, 3, 4].includes(Number(input?.layout)) ? Number(input.layout) : DEFAULT_STATE.layout;
   const sourceSlots = Array.isArray(input?.slots) ? input.slots : DEFAULT_STATE.slots;
   const slots = Array.from({ length: SLOT_COUNT }, (_, index) => ({
-    url: String(sourceSlots[index]?.url || "")
+    url: String(sourceSlots[index]?.url || ""),
+    title: normalizePageTitle(sourceSlots[index]?.title)
   }));
 
   return {
