@@ -493,7 +493,7 @@ body.is-browser-fullscreen .stage {
 
 .slot-label-group {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-items: center;
   min-width: 0;
   overflow: hidden;
@@ -508,7 +508,9 @@ body.is-browser-fullscreen .stage {
 }
 
 .slot-title {
-  flex: 1 1 auto;
+  width: 0;
+  max-width: 100%;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   color: var(--quiet);
