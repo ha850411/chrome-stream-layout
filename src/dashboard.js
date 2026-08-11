@@ -628,7 +628,29 @@ async function renderStage() {
   const currentRenderToken = ++renderToken;
   const layout = state.layout;
   const slots = state.slots.slice(0, layout).map((slot) => ({ url: slot.url }));
-  const embeds = await Promise.all(slots.map((slot) => slot.url.trim() ? resolveEmbed(slot.url) : null));
+  const existingTiles = new Map(
+    Array.from(stage.querySelectorAll("[data-tile]")).map((tile) => [Number(tile.dataset.tile), tile])
+  );
+  const plans = await Promise.all(slots.map(async (slot, index) => {
+    const tile = existingTiles.get(index);
+    const sourceMatches = tile?.dataset.sourceUrl === slot.url;
+    const hasFrame = Boolean(tile?.querySelector("iframe[data-tile-frame]"));
+    const hasEmptyState = Boolean(tile?.querySelector(".tile-empty"));
+    const hasCurrentError = Boolean(
+      tile?.querySelector(".tile-error") && tile.dataset.language === state.language
+    );
+
+    if (sourceMatches && (hasFrame || (!slot.url.trim() && hasEmptyState) || hasCurrentError)) {
+      return { embed: null, reuse: true, slot, tile };
+    }
+
+    return {
+      embed: slot.url.trim() ? await resolveEmbed(slot.url) : null,
+      reuse: false,
+      slot,
+      tile
+    };
+  }));
 
   if (currentRenderToken !== renderToken) {
     return;
@@ -636,31 +658,39 @@ async function renderStage() {
 
   stage.className = `stage layout-${layout}`;
   fixedViewportObserver.disconnect();
-  stage.replaceChildren();
+  stage.querySelectorAll("[data-splitter]").forEach((splitter) => splitter.remove());
+  stage.querySelectorAll("[data-tile]").forEach((tile) => {
+    if (Number(tile.dataset.tile) >= layout) {
+      tile.remove();
+    }
+  });
 
-  for (let index = 0; index < layout; index += 1) {
-    const slot = slots[index];
-    const tile = document.createElement("article");
-    tile.className = `tile tile-${index + 1}`;
-    tile.dataset.tile = String(index);
+  plans.forEach(({ embed, reuse, slot, tile: existingTile }, index) => {
+    const tile = existingTile || document.createElement("article");
+    tile.classList.add("tile");
+    retargetStageTile(tile, index);
+    tile.dataset.sourceUrl = slot.url;
+    tile.dataset.language = state.language;
 
-    if (!slot.url.trim()) {
-      tile.append(createEmptyState(index));
-      stage.append(tile);
-      continue;
+    if (reuse) {
+      const iframe = tile.querySelector("iframe[data-tile-frame]");
+      if (iframe) {
+        iframe.title = t("pane", { number: index + 1 });
+      } else if (!slot.url.trim()) {
+        tile.replaceChildren(createEmptyState(index));
+      }
+    } else if (!slot.url.trim()) {
+      tile.replaceChildren(createEmptyState(index));
+    } else if (!embed.ok) {
+      tile.replaceChildren(createErrorState(embed.message));
+    } else {
+      tile.replaceChildren(createTileFrame(index, embed, slot.url));
     }
 
-    const embed = embeds[index];
-
-    if (!embed.ok) {
-      tile.append(createErrorState(embed.message));
+    if (!existingTile) {
       stage.append(tile);
-      continue;
     }
-
-    tile.append(createTileFrame(index, embed, slot.url));
-    stage.append(tile);
-  }
+  });
 
   appendSplitters();
   applyStageSizing();
