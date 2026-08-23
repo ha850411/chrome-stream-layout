@@ -1199,7 +1199,7 @@ async function getBilibiliLivePlayerUrl(url) {
   const playerUrl = new URL("https://www.bilibili.com/blackboard/live/live-activity-player.html");
   playerUrl.searchParams.set("cid", resolvedRoomId);
   playerUrl.searchParams.set("mute", "1");
-  playerUrl.searchParams.set("danmaku", "0");
+  playerUrl.searchParams.set("danmaku", "1");
   playerUrl.searchParams.set("fullscreen", "1");
   playerUrl.searchParams.set("quality", "1");
   playerUrl.searchParams.set("sendpanel", "0");
