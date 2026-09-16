@@ -15,11 +15,20 @@
       <section class="control-dialog" role="dialog" aria-modal="true" aria-labelledby="controlsTitle">
         <form class="stream-form" id="streamForm">
           <div class="dialog-head">
-            <div>
-              <h1 id="controlsTitle">Stream Layout</h1>
-              <p id="controlsSubtitle">Sources and layout</p>
+            <div class="dialog-brand">
+              <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2"></rect><rect x="14" y="4" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="6" rx="2"></rect></svg>
+              </span>
+              <div>
+                <h1 id="controlsTitle">Stream Layout</h1>
+                <p id="controlsSubtitle">Sources and layout</p>
+              </div>
             </div>
             <div class="dialog-head-actions">
+              <select class="language-select" id="languageSelect" aria-label="Language" title="Language">
+                <option value="zh-TW">繁中</option>
+                <option value="en">EN</option>
+              </select>
               <button class="icon-button" id="reloadAllButton" type="button" title="Reload all" aria-label="Reload all">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M21 12a9 9 0 0 1-15.4 6.4M3 12A9 9 0 0 1 18.4 5.6"></path>
@@ -41,14 +50,6 @@
             </div>
           </div>
 
-          <div class="language-field">
-            <span id="languageLabel">Language</span>
-            <div class="language-switch" id="languageSwitch" role="group" aria-labelledby="languageLabel">
-              <button class="language-option" type="button" data-language="zh-TW" aria-pressed="false">繁體中文</button>
-              <button class="language-option" type="button" data-language="en" aria-pressed="false">English</button>
-            </div>
-          </div>
-
           <div class="layout-switch" role="group" aria-label="Pane count">
             <button class="segment" type="button" data-layout="2" aria-pressed="false">2</button>
             <button class="segment" type="button" data-layout="3" aria-pressed="false">3</button>
@@ -58,10 +59,20 @@
           <p class="playback-notice" id="playbackNotice" role="status" hidden></p>
           <div class="slot-controls" id="slotControls"></div>
 
-          <div class="form-actions">
-            <span id="saveStatus" aria-live="polite"></span>
-            <button class="secondary-button" id="clearButton" type="button">Clear</button>
-            <button class="primary-button" id="applyButton" type="submit">Apply</button>
+          <div class="form-footer">
+            <div class="draft-notice" id="draftNotice" hidden>
+              <span id="pendingStatus" role="status"></span>
+              <button class="text-button" id="discardButton" type="button">Discard changes</button>
+            </div>
+            <div class="undo-notice" id="undoNotice" hidden>
+              <span id="undoMessage" role="status"></span>
+              <button class="text-button" id="undoButton" type="button">Undo</button>
+            </div>
+            <div class="form-actions">
+              <button class="text-button clear-all-button" id="clearButton" type="button">Clear all</button>
+              <span id="saveStatus" aria-live="polite"></span>
+              <button class="primary-button" id="applyButton" type="submit">Done</button>
+            </div>
           </div>
         </form>
       </section>

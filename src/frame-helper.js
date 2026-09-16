@@ -59,6 +59,12 @@ let refreshPlayerObservation = () => {};
 
   const hostname = location.hostname.toLowerCase();
 
+  if (hostname === "liveshare.huya.com" && location.pathname.startsWith("/iframe/") &&
+      isDirectlyEmbeddedByThisExtension()) {
+    installHuyaPlayerStyle();
+    return;
+  }
+
   if (isYouTubeHost(hostname)) {
     if (isYouTubeEmbedPage()) {
       installYouTubeEmbedErrorReporter();
@@ -73,6 +79,67 @@ let refreshPlayerObservation = () => {};
     installYesLiveTheaterHelper();
   }
 })();
+
+function installHuyaPlayerStyle() {
+  if (document.getElementById("chrome-stream-layout-huya-style")) return;
+  const style = document.createElement("style");
+  style.id = "chrome-stream-layout-huya-style";
+  // These are Huya's room-navigation prompts, not playback controls. CSS
+  // also covers elements inserted later or recreated by the player.
+  style.textContent = `
+    #player-enter-room,
+    #player-enter-room-center,
+    .player-enter-room,
+    .player-enter-room-center {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* Huya centers these popovers on the button using negative left margins.
+       In a pane the right-hand portion is clipped by the iframe boundary. */
+    #player-wrap .player-danmu-pane {
+      position: fixed !important;
+      left: auto !important;
+      right: 8px !important;
+      bottom: 46px !important;
+      margin-left: 0 !important;
+      transform: scale(var(--stream-layout-huya-menu-scale, 1)) !important;
+      transform-origin: right bottom !important;
+    }
+
+    #player-wrap .player-danmu-pane::before,
+    #player-wrap .player-danmu-pane::after {
+      left: auto !important;
+      right: 20px !important;
+    }
+
+    #player-wrap .player-videotype-list {
+      position: fixed !important;
+      left: auto !important;
+      right: 75px !important;
+      bottom: 46px !important;
+      margin-left: 0 !important;
+      max-height: calc(100vh - 64px) !important;
+      overflow-y: auto !important;
+    }
+
+    #player-wrap .player-videotype-list.has-bitrate-btn {
+      right: 8px !important;
+      max-width: calc(100vw - 16px) !important;
+    }
+  `;
+  (document.head || document.documentElement).append(style);
+
+  // Preserve all controls in the fixed-size 210×220 danmu panel even when
+  // the user makes a pane narrower or shorter than the menu itself.
+  const fitMenu = () => {
+    const scale = Math.max(0.1, Math.min(1, (innerWidth - 16) / 210, (innerHeight - 60) / 220));
+    document.documentElement.style.setProperty("--stream-layout-huya-menu-scale", String(scale));
+  };
+  fitMenu();
+  window.addEventListener("resize", fitMenu, { passive: true });
+}
 
 function isYouTubeEmbedPage() {
   return location.pathname.startsWith("/embed/");

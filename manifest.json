@@ -47,6 +47,7 @@
     },
     {
       "matches": [
+        "*://liveshare.huya.com/iframe/*",
         "*://youtube.com/*",
         "*://*.youtube.com/*",
         "*://youtube-nocookie.com/*",

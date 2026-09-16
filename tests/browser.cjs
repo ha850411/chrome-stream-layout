@@ -20,6 +20,7 @@ const os = require("node:os");
       args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, "--no-sandbox"]
     });
     const heldRequests = new Map();
+    const huyaFixture = await fs.readFile(path.join(__dirname, "fixtures/huya.html"), "utf8");
     const waitForHeld = async (id) => {
       for (let i = 0; i < 250 && !heldRequests.has(id); i++) await new Promise((r) => setTimeout(r, 20));
       assert.ok(heldRequests.has(id), `expected room request ${id}`);
@@ -36,7 +37,8 @@ const os = require("node:os");
         ? '<div class="ytp-error">Embed unavailable</div>'
         : '<div id="movie_player" style="width:640px;height:360px"><video></video></div>';
       if (url.hostname === "yeslivetv.com") player = '<div id="player" style="width:640px;height:360px"><video></video></div>';
-      await route.fulfill({ contentType: "text/html", body: `<!doctype html><title>Fixture stream</title><body style="margin:0;background:#151515;color:white">${player}</body>` });
+      if (url.hostname === "liveshare.huya.com") player = huyaFixture;
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: `<!doctype html><title>Fixture stream</title><body style="margin:0;background:#151515;color:white">${player}</body>` });
     });
     const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
     const base = worker.url().split("/").slice(0, 3).join("/");
@@ -127,7 +129,7 @@ const os = require("node:os");
     });
     await page.locator("#applyButton").focus();
     await page.keyboard.press("Tab");
-    assert.equal(await page.evaluate(() => document.activeElement.id), "reloadAllButton");
+    assert.equal(await page.evaluate(() => document.activeElement.id), "languageSelect");
     await page.keyboard.press("Shift+Tab");
     assert.equal(await page.evaluate(() => document.activeElement.id), "applyButton");
     assert.equal(await page.locator(".app-shell").evaluate((el) => el.inert), true);
@@ -154,6 +156,8 @@ const os = require("node:os");
     assert.equal(await page.locator("#playbackNotice").isVisible(), false);
     console.log("PASS: failed rule installation is visible and recoverable");
 
+    await require("./ui-checks.cjs")(page);
+
     const helperPage = await context.newPage();
     helperPage.on("pageerror", (error) => errors.push(error.message));
     await helperPage.goto(`${base}/dashboard.html`);
@@ -176,6 +180,7 @@ const os = require("node:os");
     await youtubePlayer.waitFor();
     assert.equal(await youtubePlayer.getAttribute("data-replaced"), "true");
     await helperPage.frameLocator('iframe[data-tile-frame="1"]').locator(".chrome-stream-layout-yeslive-primary").waitFor();
+    await require("./huya-checks.cjs")(context, helperPage);
     await helperPage.close();
     console.log("PASS: YouTube embed fallback, replaced player recovery, and YesLive promotion");
 

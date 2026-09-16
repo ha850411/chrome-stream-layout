@@ -36,7 +36,6 @@ const TRANSLATIONS = {
     language: "Language",
     paneCount: "Pane count",
     pane: "Pane {number}",
-    dragSource: "Drag source {number}",
     panePosition: "Pane {number}, {position}",
     unusedPosition: "Not in current layout",
     left: "Left",
@@ -47,9 +46,25 @@ const TRANSLATIONS = {
     bottomRight: "Bottom right",
     positionsSwapped: "Swapped panes {from} and {to}",
     idle: "Idle",
-    clear: "Clear",
+    clearAll: "Clear all",
+    undo: "Undo",
+    restored: "Sources restored",
+    discardChanges: "Discard changes",
+    pendingChanges: "Sources not applied: {number}",
+    applyChanges: "Apply ({number})",
+    done: "Done",
+    unusedSources: "Unused sources ({number})",
+    pendingSource: "Not applied",
+    newSource: "Add a stream source",
+    reloadPane: "Reload pane {number}",
+    reload: "Reload",
+    applyFirst: "Apply source changes first",
+    layout2: "Side by side",
+    layout3: "Main + two",
+    layout4: "Grid",
+    layoutOption: "{number} panes · {name}",
+    reorderHint: "Reorder source {number}: drag or press Alt + Up/Down",
     clearPane: "Clear pane {number}",
-    apply: "Apply",
     applied: "Applied",
     cleared: "Cleared",
     layoutChanged: "Layout {number}",
@@ -63,6 +78,7 @@ const TRANSLATIONS = {
     retryPane: "Retry pane {number}",
     retry: "Retry",
     sourcePending: "Apply to load this source",
+    sourceRemoving: "Apply to remove this source",
     sourceResolving: "Resolving source…",
     sourceLoading: "Loading page…",
     sourcePageLoaded: "Page loaded · playback unconfirmed",
@@ -87,7 +103,6 @@ const TRANSLATIONS = {
     language: "介面語言",
     paneCount: "窗格數量",
     pane: "窗格 {number}",
-    dragSource: "拖曳來源 {number}",
     panePosition: "窗格 {number}，{position}",
     unusedPosition: "目前版面不顯示",
     left: "左側",
@@ -98,9 +113,25 @@ const TRANSLATIONS = {
     bottomRight: "右下",
     positionsSwapped: "已交換窗格 {from} 與 {to}",
     idle: "未使用",
-    clear: "清除",
+    clearAll: "清除全部",
+    undo: "復原",
+    restored: "已復原來源",
+    discardChanges: "還原變更",
+    pendingChanges: "有 {number} 個來源尚未套用",
+    applyChanges: "套用（{number}）",
+    done: "完成",
+    unusedSources: "未使用來源（{number}）",
+    pendingSource: "尚未套用",
+    newSource: "新增直播來源",
+    reloadPane: "重新載入窗格 {number}",
+    reload: "重新載入",
+    applyFirst: "請先套用來源變更",
+    layout2: "雙畫面",
+    layout3: "主副畫面",
+    layout4: "四宮格",
+    layoutOption: "{number} 個窗格・{name}",
+    reorderHint: "調整來源 {number} 順序：拖曳或按 Alt + 上下方向鍵",
     clearPane: "清除窗格 {number}",
-    apply: "套用",
     applied: "已套用",
     cleared: "已清除",
     layoutChanged: "已切換為 {number} 個窗格",
@@ -114,6 +145,7 @@ const TRANSLATIONS = {
     retryPane: "重試窗格 {number}",
     retry: "重試",
     sourcePending: "套用後載入此來源",
+    sourceRemoving: "套用後移除此來源",
     sourceResolving: "正在解析來源…",
     sourceLoading: "正在載入頁面…",
     sourcePageLoaded: "頁面已載入・尚未確認播放",
@@ -139,6 +171,10 @@ const ICONS = {
 };
 
 let state = structuredClone(DEFAULT_STATE);
+// Draft URLs never enter persisted state or playback until Apply is pressed.
+let draftUrls = null;
+let clearedSources = null;
+let unusedSourcesExpanded = false;
 let saveTimer = 0;
 const tileLoads = new WeakMap();
 const frameLoadTimers = new Map();
@@ -164,10 +200,15 @@ const reloadAllButton = document.querySelector("#reloadAllButton");
 const closeControlsButton = document.querySelector("#closeControlsButton");
 const applyButton = document.querySelector("#applyButton");
 const controlsSubtitle = document.querySelector("#controlsSubtitle");
-const languageLabel = document.querySelector("#languageLabel");
+const languageSelect = document.querySelector("#languageSelect");
+const draftNotice = document.querySelector("#draftNotice");
+const pendingStatus = document.querySelector("#pendingStatus");
+const discardButton = document.querySelector("#discardButton");
+const undoNotice = document.querySelector("#undoNotice");
+const undoMessage = document.querySelector("#undoMessage");
+const undoButton = document.querySelector("#undoButton");
 const playbackNotice = document.querySelector("#playbackNotice");
 const appShell = document.querySelector(".app-shell");
-const languageButtons = Array.from(document.querySelectorAll("[data-language]"));
 const layoutButtons = Array.from(document.querySelectorAll("[data-layout]"));
 const fixedViewportObserver = new ResizeObserver(updateFixedViewportScales);
 
@@ -221,22 +262,56 @@ function bindEvents() {
     if (!input) return;
 
     const index = Number(input.dataset.urlInput);
-    state.slots[index] = { url: input.value.trim(), title: "" };
+    draftUrls ||= state.slots.map((slot) => slot.url);
+    draftUrls[index] = input.value.trim();
+    clearedSources = null;
     updateSlotSourceSummary(index);
     updateSlotTitle(index);
     updateSlotPlaybackStatus(index);
+    updateDraftControls();
   });
 
   slotControls.addEventListener("dragstart", startSlotDrag);
   slotControls.addEventListener("dragover", continueSlotDrag);
   slotControls.addEventListener("drop", finishSlotDrop);
   slotControls.addEventListener("dragend", endSlotDrag);
+  slotControls.addEventListener("keydown", (event) => {
+    const handle = event.target.closest("[data-drag-slot]");
+    if (!handle || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const index = Number(handle.dataset.dragSlot);
+    const target = index + (event.key === "ArrowUp" ? -1 : 1);
+    if (target < 0 || target >= SLOT_COUNT) return;
+    if (target >= state.layout) unusedSourcesExpanded = true;
+    swapSourceSlots(index, target);
+    slotControls.querySelector(`[data-drag-slot="${target}"]`)?.focus();
+  });
 
   clearButton.addEventListener("click", () => {
+    clearedSources = { slots: structuredClone(state.slots), draftUrls: draftUrls?.slice() || null };
     state.slots = state.slots.map(() => ({ url: "", title: "" }));
+    draftUrls = null;
     renderControls();
     void renderStage();
     void persistState(t("cleared"));
+    undoButton.focus();
+  });
+
+  undoButton.addEventListener("click", () => {
+    if (!clearedSources) return;
+    state.slots = clearedSources.slots;
+    draftUrls = clearedSources.draftUrls;
+    clearedSources = null;
+    renderControls();
+    void renderStage();
+    void persistState(t("restored"));
+    clearButton.focus();
+  });
+
+  discardButton.addEventListener("click", () => {
+    draftUrls = null;
+    renderControls();
+    applyButton.focus();
   });
 
   closeControlsButton.addEventListener("click", closeControls);
@@ -276,7 +351,6 @@ function bindEvents() {
 
   layoutButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      syncStateFromForm();
       state.layout = Number(button.dataset.layout);
       renderControls();
       void renderStage();
@@ -284,15 +358,12 @@ function bindEvents() {
     });
   });
 
-  languageButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      syncStateFromForm();
-      state.language = normalizeLanguage(button.dataset.language);
-      applyLanguage();
-      renderControls();
-      void renderStage();
-      void persistState(t("languageChanged"));
-    });
+  languageSelect.addEventListener("change", () => {
+    state.language = normalizeLanguage(languageSelect.value);
+    applyLanguage();
+    renderControls();
+    void renderStage();
+    void persistState(t("languageChanged"));
   });
 
   stage.addEventListener("pointerdown", startResize);
@@ -367,148 +438,185 @@ async function hasRecentOpenControlsRequest() {
   return Number.isFinite(requestedAt) && Date.now() - requestedAt < OPEN_CONTROLS_MAX_AGE_MS;
 }
 
+function getEditableSlot(index) {
+  const saved = state.slots[index];
+  const url = draftUrls?.[index] ?? saved.url;
+  return { url, title: url === saved.url ? saved.title : "" };
+}
+
+function getPendingSourceCount() {
+  return state.slots.reduce((count, slot, index) => count + Number(getEditableSlot(index).url !== slot.url), 0);
+}
+
+function updateDraftControls() {
+  const pending = getPendingSourceCount();
+  draftNotice.hidden = !pending;
+  pendingStatus.textContent = pending ? t("pendingChanges", { number: pending }) : "";
+  applyButton.textContent = pending ? t("applyChanges", { number: pending }) : t("done");
+  undoNotice.hidden = !clearedSources;
+  undoMessage.textContent = clearedSources ? t("cleared") : "";
+  clearButton.disabled = !state.slots.some((slot) => slot.url) &&
+    !state.slots.some((_, index) => getEditableSlot(index).url);
+}
+
 function renderControls() {
   slotControls.replaceChildren();
+  let unusedList = null;
+  if (state.layout < SLOT_COUNT) {
+    const details = document.createElement("details");
+    details.className = "unused-sources";
+    details.open = unusedSourcesExpanded;
+    const summary = document.createElement("summary");
+    summary.textContent = t("unusedSources", { number: SLOT_COUNT - state.layout });
+    unusedList = document.createElement("div");
+    unusedList.className = "unused-source-list";
+    details.append(summary, unusedList);
+    details.addEventListener("toggle", () => {
+      if (details.isConnected) unusedSourcesExpanded = details.open;
+    });
+    slotControls.append(details);
+  }
 
   for (let index = 0; index < SLOT_COUNT; index += 1) {
-    const slot = state.slots[index];
-    const disabled = index >= state.layout;
+    const slot = getEditableSlot(index);
+    const inactive = index >= state.layout;
     const wrapper = document.createElement("div");
-    wrapper.className = `slot-control${disabled ? " is-disabled" : ""}`;
+    wrapper.className = `slot-control${inactive ? " is-inactive" : ""}`;
     wrapper.dataset.slotTarget = String(index);
-    wrapper.dataset.dragSlot = String(index);
-    wrapper.draggable = true;
 
-    const labelRow = document.createElement("div");
-    labelRow.className = "slot-label-row";
+    const header = document.createElement("div");
+    header.className = "slot-header";
+    const position = document.createElement("div");
+    position.className = "slot-position";
+    position.append(createPaneLocationIcon(index));
+    const number = document.createElement("span");
+    number.className = "slot-number";
+    number.textContent = String(index + 1).padStart(2, "0");
+    number.setAttribute("aria-label", t("pane", { number: index + 1 }));
+    position.append(number);
 
-    const labelGroup = document.createElement("div");
-    labelGroup.className = "slot-label-group";
+    const heading = document.createElement("div");
+    heading.className = "slot-heading";
+    const title = document.createElement("label");
+    title.className = "slot-title";
+    title.htmlFor = `slot-url-${index}`;
+    title.dataset.slotTitle = String(index);
+    title.dir = "auto";
+    const metadata = document.createElement("div");
+    metadata.className = "slot-meta";
+    const source = document.createElement("span");
+    source.dataset.sourceSummary = String(index);
+    const locationLabel = document.createElement("span");
+    locationLabel.textContent = getPanePositionLabel(index);
+    const pending = document.createElement("span");
+    pending.className = "pending-badge";
+    pending.dataset.pendingSlot = String(index);
+    pending.textContent = t("pendingSource");
+    metadata.append(source, locationLabel, pending);
+    heading.append(title, metadata);
 
     const dragHandle = document.createElement("button");
     dragHandle.className = "drag-handle";
     dragHandle.type = "button";
-    dragHandle.draggable = false;
-    dragHandle.title = t("dragSource", { number: index + 1 });
+    dragHandle.draggable = true;
+    dragHandle.dataset.dragSlot = String(index);
+    dragHandle.title = t("reorderHint", { number: index + 1 });
     dragHandle.setAttribute("aria-label", dragHandle.title);
+    dragHandle.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     dragHandle.innerHTML = ICONS.grip;
-
-    const label = document.createElement("label");
-    label.htmlFor = `slot-url-${index}`;
-    label.textContent = t("pane", { number: index + 1 });
-
-    const title = document.createElement("span");
-    title.className = "slot-title";
-    title.dataset.slotTitle = String(index);
-    title.textContent = slot.title;
-    title.title = slot.title;
-    title.dir = "auto";
-
-    const status = document.createElement("span");
-    status.dataset.sourceSummary = String(index);
-    status.textContent = disabled ? t("idle") : getSourceLabel(slot.url) || t("noSource");
-
-    labelGroup.append(dragHandle, label, title);
-    labelRow.append(labelGroup, status);
+    header.append(position, heading, dragHandle);
 
     const row = document.createElement("div");
     row.className = "url-row";
-
     const input = document.createElement("input");
     input.id = `slot-url-${index}`;
-    input.type = "url";
+    input.type = "text";
     input.inputMode = "url";
-    input.placeholder = "https://example.com/video";
+    input.spellcheck = false;
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", t("pane", { number: index + 1 }) + " URL");
+    input.placeholder = "https://example.com/live";
     input.value = slot.url;
     input.dataset.urlInput = String(index);
-
     const inputShell = document.createElement("div");
     inputShell.className = "url-input-shell";
-    inputShell.append(createPaneLocationIcon(index), input);
+    inputShell.append(input);
 
     const clearSlotButton = document.createElement("button");
     clearSlotButton.className = "mini-button";
     clearSlotButton.type = "button";
-    clearSlotButton.title = t("clear");
-    clearSlotButton.setAttribute("aria-label", t("clearPane", { number: index + 1 }));
+    clearSlotButton.title = t("clearPane", { number: index + 1 });
+    clearSlotButton.setAttribute("aria-label", clearSlotButton.title);
     clearSlotButton.dataset.clearSlot = String(index);
     clearSlotButton.innerHTML = ICONS.clear;
-
     row.append(inputShell, clearSlotButton);
+
     const playbackRow = document.createElement("div");
     playbackRow.className = "slot-playback-row";
-    const playbackStatus = document.createElement("span");
-    playbackStatus.dataset.playbackStatus = String(index);
-    playbackStatus.setAttribute("aria-live", "polite");
+    const status = document.createElement("span");
+    status.className = "source-status";
+    status.dataset.statusContainer = String(index);
+    const statusIcon = document.createElement("span");
+    statusIcon.className = "status-icon";
+    statusIcon.dataset.statusIcon = String(index);
+    statusIcon.setAttribute("aria-hidden", "true");
+    const statusText = document.createElement("span");
+    statusText.dataset.playbackStatus = String(index);
+    statusText.setAttribute("aria-live", "polite");
+    status.append(statusIcon, statusText);
     const retryButton = document.createElement("button");
     retryButton.type = "button";
     retryButton.className = "retry-button";
     retryButton.dataset.retrySlot = String(index);
-    retryButton.textContent = t("retry");
-    retryButton.setAttribute("aria-label", t("retryPane", { number: index + 1 }));
-    playbackRow.append(playbackStatus, retryButton);
-    wrapper.append(labelRow, row, playbackRow);
-    slotControls.append(wrapper);
+    playbackRow.append(status, retryButton);
+    wrapper.append(header, row, playbackRow);
+    if (inactive) unusedList.append(wrapper);
+    else slotControls.insertBefore(wrapper, slotControls.querySelector(".unused-sources"));
+    updateSlotSourceSummary(index);
+    updateSlotTitle(index);
     updateSlotPlaybackStatus(index);
   }
 
   layoutButtons.forEach((button) => {
-    const active = Number(button.dataset.layout) === state.layout;
+    const layout = Number(button.dataset.layout);
+    const active = layout === state.layout;
+    const label = document.createElement("span");
+    label.textContent = `${layout} · ${t(`layout${layout}`)}`;
+    button.replaceChildren(createLayoutPreview(layout), label);
+    button.setAttribute("aria-label", t("layoutOption", { number: layout, name: t(`layout${layout}`) }));
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
-
-  languageButtons.forEach((button) => {
-    const active = button.dataset.language === state.language;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
+  languageSelect.value = state.language;
+  updateDraftControls();
 }
 
-function createPaneLocationIcon(index) {
-  const regionSets = {
-    2: [
-      { x: 1, y: 1, width: 14, height: 20 },
-      { x: 17, y: 1, width: 14, height: 20 }
-    ],
-    3: [
-      { x: 1, y: 1, width: 18, height: 20 },
-      { x: 21, y: 1, width: 10, height: 9 },
-      { x: 21, y: 12, width: 10, height: 9 }
-    ],
-    4: [
-      { x: 1, y: 1, width: 14, height: 9 },
-      { x: 17, y: 1, width: 14, height: 9 },
-      { x: 1, y: 12, width: 14, height: 9 },
-      { x: 17, y: 12, width: 14, height: 9 }
-    ]
+function createLayoutPreview(layout, activeIndex = null) {
+  const regions = {
+    2: [[1, 1, 14, 20], [17, 1, 14, 20]],
+    3: [[1, 1, 18, 20], [21, 1, 10, 9], [21, 12, 10, 9]],
+    4: [[1, 1, 14, 9], [17, 1, 14, 9], [1, 12, 14, 9], [17, 12, 14, 9]]
   };
-  const active = index < state.layout;
-  const position = getPanePositionLabel(index);
-  const icon = document.createElement("span");
-  icon.className = `pane-location-icon${active ? "" : " is-inactive"}`;
-  icon.title = t("panePosition", { number: index + 1, position });
-  icon.setAttribute("role", "img");
-  icon.setAttribute("aria-label", icon.title);
-
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 32 22");
   svg.setAttribute("aria-hidden", "true");
-
-  regionSets[state.layout].forEach((region, regionIndex) => {
+  regions[layout].forEach(([x, y, width, height], index) => {
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(region.x));
-    rect.setAttribute("y", String(region.y));
-    rect.setAttribute("width", String(region.width));
-    rect.setAttribute("height", String(region.height));
-    rect.setAttribute("rx", "1.5");
-    if (active && regionIndex === index) {
-      rect.classList.add("is-current");
-    }
+    Object.entries({ x, y, width, height, rx: 1.5 }).forEach(([key, value]) => rect.setAttribute(key, String(value)));
+    if (index === activeIndex) rect.classList.add("is-current");
     svg.append(rect);
   });
+  return svg;
+}
 
-  icon.append(svg);
+function createPaneLocationIcon(index) {
+  const active = index < state.layout;
+  const icon = document.createElement("span");
+  icon.className = `pane-location-icon${active ? "" : " is-inactive"}`;
+  icon.title = t("panePosition", { number: index + 1, position: getPanePositionLabel(index) });
+  icon.setAttribute("role", "img");
+  icon.setAttribute("aria-label", icon.title);
+  icon.append(createLayoutPreview(state.layout, active ? index : null));
   return icon;
 }
 
@@ -525,7 +633,9 @@ function getPanePositionLabel(index) {
 function updateSlotSourceSummary(index) {
   const summary = slotControls.querySelector(`[data-source-summary="${index}"]`);
   if (summary) {
-    summary.textContent = index >= state.layout ? t("idle") : getSourceLabel(state.slots[index].url) || t("noSource");
+    const label = getSourceLabel(getEditableSlot(index).url);
+    summary.textContent = label;
+    summary.dataset.platform = label.toLowerCase();
   }
 }
 
@@ -533,20 +643,38 @@ function updateSlotTitle(index) {
   const title = slotControls.querySelector(`[data-slot-title="${index}"]`);
   if (!title) return;
 
-  title.textContent = state.slots[index].title;
-  title.title = state.slots[index].title;
+  const slot = getEditableSlot(index);
+  title.textContent = slot.title || getSourceLabel(slot.url) || t("newSource");
+  title.title = title.textContent;
+  title.classList.toggle("is-placeholder", !slot.url);
 }
 
 function updateSlotPlaybackStatus(index) {
   const status = slotControls.querySelector(`[data-playback-status="${index}"]`);
   if (!status) return;
-  const slot = state.slots[index];
+  const slot = getEditableSlot(index);
+  const pending = slot.url !== state.slots[index].url;
   const tile = stage.querySelector(`[data-tile="${index}"]`);
   const inactive = index >= state.layout;
-  const key = inactive ? "idle" : !slot.url.trim() ? "noSource" :
+  const key = pending ? "sourcePending" : inactive ? "idle" : !slot.url.trim() ? "noSource" :
     tile?.dataset.sourceUrl !== slot.url ? "sourcePending" : tile.dataset.status || "sourceLoading";
-  status.textContent = t(key);
-  slotControls.querySelector(`[data-retry-slot="${index}"]`).disabled = inactive || !slot.url.trim();
+  status.textContent = t(pending && !slot.url ? "sourceRemoving" : key);
+  const failed = ["sourceFailed", "sourceTimeout", "sourceMediaError", "sourceLoadUnconfirmed", "httpOnly", "enterCompleteUrl"].includes(key);
+  const loading = ["sourceResolving", "sourceLoading", "sourceBuffering"].includes(key);
+  const tone = pending ? "pending" : failed ? "error" : loading ? "loading" : key === "sourcePlaying" ? "playing" : "neutral";
+  const container = slotControls.querySelector(`[data-status-container="${index}"]`);
+  container.dataset.tone = tone;
+  const icon = slotControls.querySelector(`[data-status-icon="${index}"]`);
+  icon.textContent = failed ? "!" : pending ? "○" : loading ? "" : key === "sourcePlaying" ? "▶" : key === "sourcePaused" ? "Ⅱ" : "·";
+  const retry = slotControls.querySelector(`[data-retry-slot="${index}"]`);
+  retry.disabled = inactive || pending || !slot.url.trim();
+  retry.textContent = t(failed ? "retry" : "reload");
+  retry.classList.toggle("is-retry", failed);
+  retry.title = pending ? t("applyFirst") : t(failed ? "retryPane" : "reloadPane", { number: index + 1 });
+  retry.setAttribute("aria-label", retry.title);
+  slotControls.querySelector(`[data-pending-slot="${index}"]`).hidden = !pending;
+  slotControls.querySelector(`[data-slot-target="${index}"]`).classList.toggle("has-draft", pending);
+  slotControls.querySelector(`[data-clear-slot="${index}"]`).disabled = !slot.url;
 }
 
 function setTileStatus(tile, status) {
@@ -556,16 +684,20 @@ function setTileStatus(tile, status) {
 
 function startSlotDrag(event) {
   const source = event.target.closest("[data-drag-slot]");
-  if (!source) return;
+  if (!source) {
+    event.preventDefault();
+    return;
+  }
 
   draggedSlotIndex = Number(source.dataset.dragSlot);
-  dragSlotRects = Array.from(slotControls.querySelectorAll("[data-slot-target]")).map((element) => ({
+  dragSlotRects = Array.from(slotControls.querySelectorAll("[data-slot-target]")).filter((element) =>
+    element.getClientRects().length && !element.closest("details:not([open])")
+  ).map((element) => ({
     index: Number(element.dataset.slotTarget),
     rect: element.getBoundingClientRect()
   }));
   document.body.classList.add("is-reordering");
-  source.classList.add("is-dragging");
-  source.setAttribute("aria-grabbed", "true");
+  source.closest("[data-slot-target]").classList.add("is-dragging");
 
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", String(draggedSlotIndex));
@@ -594,21 +726,23 @@ function finishSlotDrop(event) {
     return;
   }
 
-  syncStateFromForm();
-  [state.slots[draggedSlotIndex], state.slots[targetIndex]] = [
-    state.slots[targetIndex],
-    state.slots[draggedSlotIndex]
-  ];
-
   const previousIndex = draggedSlotIndex;
   endSlotDrag();
-  renderControls();
-  if (!swapRenderedStageTiles(previousIndex, targetIndex)) {
+  swapSourceSlots(previousIndex, targetIndex);
+}
+
+function swapSourceSlots(fromIndex, toIndex) {
+  if (fromIndex === toIndex) return;
+  clearedSources = null;
+  [state.slots[fromIndex], state.slots[toIndex]] = [state.slots[toIndex], state.slots[fromIndex]];
+  if (draftUrls) [draftUrls[fromIndex], draftUrls[toIndex]] = [draftUrls[toIndex], draftUrls[fromIndex]];
+  if (!swapRenderedStageTiles(fromIndex, toIndex)) {
     void renderStage();
   }
+  renderControls();
   void persistState(t("positionsSwapped", {
-    from: previousIndex + 1,
-    to: targetIndex + 1
+    from: fromIndex + 1,
+    to: toIndex + 1
   }));
 }
 
@@ -618,7 +752,6 @@ function endSlotDrag() {
   document.body.classList.remove("is-reordering");
   slotControls.querySelectorAll(".is-dragging").forEach((element) => {
     element.classList.remove("is-dragging");
-    element.removeAttribute("aria-grabbed");
   });
   clearSlotSwapPreview();
   clearSlotDropTargets();
@@ -933,6 +1066,7 @@ function createEmptyState(index) {
   const empty = document.createElement("div");
   empty.className = "tile-empty";
   empty.innerHTML = `<span><strong>${escapeHtml(t("pane", { number: index + 1 }))}</strong>${escapeHtml(t("noSource"))}</span>`;
+  empty.prepend(createLayoutPreview(state.layout, index));
   return empty;
 }
 
@@ -944,9 +1078,10 @@ function createErrorState(message) {
 }
 
 function syncStateFromForm() {
+  if (getPendingSourceCount()) clearedSources = null;
   const nextSlots = Array.from({ length: SLOT_COUNT }, (_, index) => {
     const input = slotControls.querySelector(`[data-url-input="${index}"]`);
-    const url = input ? input.value.trim() : state.slots[index].url;
+    const url = input ? input.value.trim() : getEditableSlot(index).url;
     return {
       url,
       title: url === state.slots[index].url ? state.slots[index].title : ""
@@ -957,6 +1092,7 @@ function syncStateFromForm() {
     ...state,
     slots: nextSlots
   });
+  draftUrls = null;
 }
 
 function openControls() {
@@ -981,8 +1117,9 @@ function closeControls() {
 }
 
 function trapControlsFocus(event) {
-  const controls = Array.from(controlOverlay.querySelectorAll("button:not(:disabled), input:not(:disabled), [tabindex='0']"))
-    .filter((element) => element.getClientRects().length);
+  const controls = Array.from(controlOverlay.querySelectorAll("button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex='0']"))
+    .filter((element) => element.getClientRects().length && !element.closest("[hidden]") &&
+      (element.matches("summary") || !element.closest("details:not([open])")));
   const first = controls[0];
   const last = controls.at(-1);
   if (!first) return;
@@ -1622,9 +1759,11 @@ function t(key, replacements = {}) {
 function applyLanguage() {
   document.documentElement.lang = state.language === "zh-TW" ? "zh-Hant" : "en";
   controlsSubtitle.textContent = t("sourcesAndLayout");
-  languageLabel.textContent = t("language");
-  clearButton.textContent = t("clear");
-  applyButton.textContent = t("apply");
+  languageSelect.title = t("language");
+  languageSelect.setAttribute("aria-label", t("language"));
+  clearButton.textContent = t("clearAll");
+  discardButton.textContent = t("discardChanges");
+  undoButton.textContent = t("undo");
   reloadAllButton.title = t("reloadAll");
   reloadAllButton.setAttribute("aria-label", t("reloadAll"));
   closeControlsButton.title = t("close");

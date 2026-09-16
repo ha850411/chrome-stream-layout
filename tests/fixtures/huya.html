@@ -1,0 +1,34 @@
+<!-- Minimal fixture of the official player's popover geometry (2026-09-16). -->
+<style>
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  #player-wrap { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+  video { display: block; width: 100%; height: calc(100% - 80px); object-fit: contain; }
+  #player-ctrl-wrap { position: absolute; bottom: 0; width: 100%; height: 36px; }
+  #player-ctrl-wrap > button { width: 24px; overflow: hidden; }
+  #player-danmu-wrap { position: absolute; top: 8px; right: 10px; width: 50px; height: 20px; }
+  #player-danmu-btn { box-sizing: border-box; width: 50px; height: 20px; padding: 0; }
+  .player-danmu-pane { display: none; position: absolute; bottom: 43px; margin-left: -84px; width: 210px; height: 220px; background: #292929; }
+  .player-videotype { position: absolute; top: 8px; right: 75px; width: 60px; height: 20px; }
+  .player-videotype-list { display: none; position: absolute; bottom: 34px; left: 2px; width: 56px; height: 100px; }
+  .player-videotype-list.has-bitrate-btn { width: 200px !important; left: -67px !important; }
+  #player-danmu-wrap:hover .player-danmu-pane, .player-videotype:hover .player-videotype-list { display: block; }
+</style>
+<div id="player-wrap">
+  <video controls muted></video>
+  <div id="player-enter-room" class="player-enter-room">进入直播间</div>
+  <div id="player-enter-room-center" class="player-enter-room-center">进入直播间</div>
+  <div class="player-tip">Playback help</div>
+  <div id="player-ctrl-wrap">
+    <button id="player-play-btn">Play</button>
+    <button id="player-volume-btn">Volume</button>
+    <button id="player-fullscreen-btn">Fullscreen</button>
+    <div class="player-videotype">
+      Quality
+      <div class="player-videotype-list"><button>Quality option</button></div>
+    </div>
+    <div id="player-danmu-wrap">
+      <button id="player-danmu-btn">Danmu</button>
+      <div class="player-danmu-pane"><button id="danmu-setting">Danmu setting</button></div>
+    </div>
+  </div>
+</div>
