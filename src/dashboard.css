@@ -464,6 +464,37 @@ body.is-browser-fullscreen .stage {
   gap: 10px;
 }
 
+.slot-playback-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: default;
+}
+
+.retry-button {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.retry-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.playback-notice {
+  margin: 0;
+  color: #f0c36a;
+  font-size: 12px;
+}
+
 .slot-control {
   position: relative;
   display: grid;

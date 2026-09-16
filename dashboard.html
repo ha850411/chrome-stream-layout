@@ -43,18 +43,19 @@
 
           <div class="language-field">
             <span id="languageLabel">Language</span>
-            <div class="language-switch" id="languageSwitch" role="radiogroup" aria-labelledby="languageLabel">
+            <div class="language-switch" id="languageSwitch" role="group" aria-labelledby="languageLabel">
               <button class="language-option" type="button" data-language="zh-TW" aria-pressed="false">繁體中文</button>
               <button class="language-option" type="button" data-language="en" aria-pressed="false">English</button>
             </div>
           </div>
 
-          <div class="layout-switch" role="radiogroup" aria-label="Pane count">
+          <div class="layout-switch" role="group" aria-label="Pane count">
             <button class="segment" type="button" data-layout="2" aria-pressed="false">2</button>
             <button class="segment" type="button" data-layout="3" aria-pressed="false">3</button>
             <button class="segment" type="button" data-layout="4" aria-pressed="false">4</button>
           </div>
 
+          <p class="playback-notice" id="playbackNotice" role="status" hidden></p>
           <div class="slot-controls" id="slotControls"></div>
 
           <div class="form-actions">

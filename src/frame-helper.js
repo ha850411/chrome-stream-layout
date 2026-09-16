@@ -50,6 +50,7 @@ let currentYouTubePlayer = null;
 let currentYesLivePlayer = null;
 let youtubePromoteTimer = 0;
 let yesLivePromoteTimer = 0;
+let refreshPlayerObservation = () => {};
 
 (() => {
   if (!isEmbeddedByThisExtension()) {
@@ -79,6 +80,7 @@ function isYouTubeEmbedPage() {
 
 function installYouTubeEmbedErrorReporter() {
   let reported = false;
+  let reportTimer = 0;
   const reportIfFailed = () => {
     if (reported || !document.querySelector(".ytp-error, .ytp-error-content-wrap")) {
       return;
@@ -91,14 +93,22 @@ function installYouTubeEmbedErrorReporter() {
       `chrome-extension://${chrome.runtime.id}`
     );
   };
-  const observer = new MutationObserver(reportIfFailed);
+  const observer = new MutationObserver(() => {
+    if (!reportTimer) reportTimer = window.setTimeout(() => {
+      reportTimer = 0;
+      reportIfFailed();
+    }, PLAYER_MUTATION_DEBOUNCE_MS);
+  });
 
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true
   });
   reportIfFailed();
-  window.setTimeout(() => observer.disconnect(), 30000);
+  window.setTimeout(() => {
+    observer.disconnect();
+    window.clearTimeout(reportTimer);
+  }, 30000);
 }
 
 function isEmbeddedByThisExtension() {
@@ -120,19 +130,13 @@ function installYouTubePlayerOnlyHelper() {
   installYouTubePlayerOnlyStyle();
   promoteYouTubePlayer();
 
-  const observer = new MutationObserver(() => {
-    ensureYouTubePlayer();
-  });
-
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  refreshPlayerObservation = watchPlayerLifecycle(getCurrentYouTubePlayer, ensureYouTubePlayer);
 
   window.addEventListener("resize", ensureYouTubePlayer, { passive: true });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       ensureYouTubePlayer();
+      refreshPlayerObservation();
     }
   });
   window.setInterval(() => {
@@ -147,20 +151,12 @@ function installYesLiveTheaterHelper() {
   installYesLiveTheaterStyle();
   scheduleYesLivePlayerPromotion();
 
-  const observer = new MutationObserver(() => {
-    if (!getCurrentYesLivePlayer()) {
-      scheduleYesLivePlayerPromotion(120);
-    }
-  });
-
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  refreshPlayerObservation = watchPlayerLifecycle(getCurrentYesLivePlayer, ensureYesLivePlayer);
 
   window.addEventListener("resize", ensureYesLivePlayer, { passive: true });
   window.addEventListener("message", (event) => {
-    if (event.data?.type === "chrome-stream-layout:viewport-change") {
+    if (event.source === window.top && event.origin === `chrome-extension://${chrome.runtime.id}` &&
+        event.data?.type === "chrome-stream-layout:viewport-change") {
       ensureYesLivePlayer();
     }
   });
@@ -174,8 +170,66 @@ function installYesLiveTheaterHelper() {
   window.setInterval(() => {
     if (!document.hidden) {
       ensureYesLivePlayer(true);
+      refreshPlayerObservation();
     }
   }, PLAYER_RECHECK_INTERVAL_MS);
+}
+
+function watchPlayerLifecycle(getPlayer, ensurePlayer) {
+  let observedPlayer;
+  let checkTimer = 0;
+  let discoveryTimer = 0;
+  let discoveryExpired = false;
+  const observer = new MutationObserver(() => {
+    if (checkTimer) return;
+    checkTimer = window.setTimeout(() => {
+      checkTimer = 0;
+      ensurePlayer();
+      refresh();
+    }, PLAYER_MUTATION_DEBOUNCE_MS);
+  });
+
+  const refresh = () => {
+    if (document.hidden) return;
+    const player = getPlayer();
+    if (player && player === observedPlayer) return;
+    if (observedPlayer) discoveryExpired = false;
+    observedPlayer = player;
+    observer.disconnect();
+    if (player) {
+      window.clearTimeout(discoveryTimer);
+      discoveryTimer = 0;
+      // Watch removal/replacement along the player ancestry, not chat or
+      // recommendations changing anywhere within the page's subtree.
+      for (let ancestor = player.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        observer.observe(ancestor, { childList: true });
+      }
+    } else if (!discoveryExpired) {
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      if (!discoveryTimer) discoveryTimer = window.setTimeout(() => {
+        discoveryExpired = true;
+        discoveryTimer = 0;
+        observer.disconnect();
+      }, 30000);
+    }
+  };
+  const suspend = () => {
+    observer.disconnect();
+    window.clearTimeout(checkTimer);
+    window.clearTimeout(discoveryTimer);
+    checkTimer = discoveryTimer = 0;
+    observedPlayer = undefined;
+  };
+  const resume = () => {
+    discoveryExpired = false;
+    ensurePlayer();
+    refresh();
+  };
+  document.addEventListener("visibilitychange", () => document.hidden ? suspend() : resume());
+  window.addEventListener("pagehide", suspend);
+  window.addEventListener("pageshow", resume);
+  refresh();
+  return refresh;
 }
 
 function installYouTubePlayerOnlyStyle() {
@@ -366,6 +420,7 @@ function promoteYouTubePlayer() {
 
   player.classList.add("chrome-stream-layout-youtube-primary");
   currentYouTubePlayer = player;
+  refreshPlayerObservation();
   document.documentElement.classList.add("chrome-stream-layout-youtube-has-player");
 
   const video = player.matches("video") ? player : player.querySelector("video");
@@ -418,6 +473,7 @@ function promoteYesLivePlayer() {
   player.classList.add("chrome-stream-layout-yeslive-primary");
   player.classList.toggle("chrome-stream-layout-yeslive-media", player.matches("iframe, video, canvas, object, embed"));
   currentYesLivePlayer = player;
+  refreshPlayerObservation();
   document.documentElement.classList.add("chrome-stream-layout-yeslive-has-player");
 
   const video = player.matches("video") ? player : player.querySelector("video");

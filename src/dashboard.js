@@ -7,6 +7,8 @@ const FRAME_VIEWPORT_NOTIFY_DELAY_MS = 100;
 const PREVIOUS_STORAGE_KEY = "live-mosaic-state-v2";
 const LEGACY_STORAGE_KEY = "live-mosaic-state-v1";
 const SLOT_COUNT = 4;
+const SOURCE_RESOLVE_TIMEOUT_MS = 8000;
+const FRAME_LOAD_TIMEOUT_MS = 20000;
 const BILIBILI_ROOM_INIT_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/room_init";
 const YESLIVE_THEATER_VIEWPORT = {
   width: 1920,
@@ -58,6 +60,20 @@ const TRANSLATIONS = {
     cannotLoad: "Cannot load",
     enterCompleteUrl: "Enter a complete URL.",
     httpOnly: "Only http and https sources are supported.",
+    retryPane: "Retry pane {number}",
+    retry: "Retry",
+    sourcePending: "Apply to load this source",
+    sourceResolving: "Resolving source…",
+    sourceLoading: "Loading page…",
+    sourcePageLoaded: "Page loaded · playback unconfirmed",
+    sourcePlaying: "Playing",
+    sourcePaused: "Paused",
+    sourceBuffering: "Buffering…",
+    sourceMediaError: "Video could not play · retry or check the source",
+    sourceLoadUnconfirmed: "Loading is taking longer than expected · try again",
+    sourceFailed: "Could not load this source. Try again.",
+    sourceTimeout: "Source lookup timed out. Try again.",
+    rulesFailed: "Playback setup failed. Use Retry or Reload all to try again.",
     video: "Video",
     dragWidth: "Drag to resize width",
     dragHeight: "Drag to resize height"
@@ -95,6 +111,20 @@ const TRANSLATIONS = {
     cannotLoad: "無法載入",
     enterCompleteUrl: "請輸入完整網址。",
     httpOnly: "僅支援 http 與 https 來源。",
+    retryPane: "重試窗格 {number}",
+    retry: "重試",
+    sourcePending: "套用後載入此來源",
+    sourceResolving: "正在解析來源…",
+    sourceLoading: "正在載入頁面…",
+    sourcePageLoaded: "頁面已載入・尚未確認播放",
+    sourcePlaying: "播放中",
+    sourcePaused: "已暫停",
+    sourceBuffering: "緩衝中…",
+    sourceMediaError: "影片無法播放，請重試或檢查來源",
+    sourceLoadUnconfirmed: "載入時間較長，可按重試重新載入",
+    sourceFailed: "無法載入此來源，請重試。",
+    sourceTimeout: "來源解析逾時，請重試。",
+    rulesFailed: "播放設定未成功，請按「重試」或「全部重新載入」。",
     video: "影片",
     dragWidth: "拖曳以調整寬度",
     dragHeight: "拖曳以調整高度"
@@ -110,7 +140,10 @@ const ICONS = {
 
 let state = structuredClone(DEFAULT_STATE);
 let saveTimer = 0;
-let renderToken = 0;
+const tileLoads = new WeakMap();
+const frameLoadTimers = new Map();
+let frameRulesFailed = false;
+let focusBeforeControls = null;
 let frameViewportNotifyTimer = 0;
 let frameViewportNotifyDeadline = 0;
 let frameViewportNotifyReason = "layout";
@@ -132,6 +165,8 @@ const closeControlsButton = document.querySelector("#closeControlsButton");
 const applyButton = document.querySelector("#applyButton");
 const controlsSubtitle = document.querySelector("#controlsSubtitle");
 const languageLabel = document.querySelector("#languageLabel");
+const playbackNotice = document.querySelector("#playbackNotice");
+const appShell = document.querySelector(".app-shell");
 const languageButtons = Array.from(document.querySelectorAll("[data-language]"));
 const layoutButtons = Array.from(document.querySelectorAll("[data-layout]"));
 const fixedViewportObserver = new ResizeObserver(updateFixedViewportScales);
@@ -145,7 +180,7 @@ async function init() {
   bindEvents();
   bindExternalEvents();
   await ensureFrameHeaderRules();
-  await renderStage();
+  void renderStage();
 
   if (consumeOpenControlsRequestFromUrl() || await hasRecentOpenControlsRequest()) {
     openControls();
@@ -163,6 +198,12 @@ function bindEvents() {
   });
 
   slotControls.addEventListener("click", (event) => {
+    const retryButton = event.target.closest("[data-retry-slot]");
+    if (retryButton) {
+      void retryTiles([Number(retryButton.dataset.retrySlot)]);
+      return;
+    }
+
     const button = event.target.closest("[data-clear-slot]");
     if (!button) return;
 
@@ -183,6 +224,7 @@ function bindEvents() {
     state.slots[index] = { url: input.value.trim(), title: "" };
     updateSlotSourceSummary(index);
     updateSlotTitle(index);
+    updateSlotPlaybackStatus(index);
   });
 
   slotControls.addEventListener("dragstart", startSlotDrag);
@@ -206,10 +248,12 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (controlOverlay.hidden) return;
     if (event.key === "Escape") {
-      if (!controlOverlay.hidden) {
-        closeControls();
-      }
+      event.preventDefault();
+      closeControls();
+    } else if (event.key === "Tab") {
+      trapControlsFocus(event);
     }
   });
 
@@ -225,6 +269,8 @@ function bindEvents() {
 
     if (event.data?.type === "chrome-stream-layout:frame-title") {
       updateTitleFromFrame(event);
+    } else if (event.data?.type === "chrome-stream-layout:media-status") {
+      updatePlaybackFromFrame(event);
     }
   });
 
@@ -250,6 +296,7 @@ function bindEvents() {
   });
 
   stage.addEventListener("pointerdown", startResize);
+  stage.addEventListener("keydown", resizeWithKeyboard);
 
   stage.addEventListener("dblclick", (event) => {
     const splitter = event.target.closest("[data-splitter]");
@@ -274,14 +321,23 @@ function bindExternalEvents() {
 
 async function ensureFrameHeaderRules() {
   if (!globalThis.chrome?.runtime?.sendMessage) {
-    return;
+    return true;
   }
 
   try {
-    await chrome.runtime.sendMessage({ type: "ensure-frame-header-rules" });
+    const response = await chrome.runtime.sendMessage({ type: "ensure-frame-header-rules" });
+    if (!response?.ok) throw new Error(response?.error || "Frame rules were not installed.");
+    frameRulesFailed = false;
   } catch {
-    // Static rules still cover this path when the background worker is unavailable.
+    frameRulesFailed = true;
   }
+  updatePlaybackNotice();
+  return !frameRulesFailed;
+}
+
+function updatePlaybackNotice() {
+  playbackNotice.hidden = !frameRulesFailed;
+  playbackNotice.textContent = frameRulesFailed ? t("rulesFailed") : "";
 }
 
 function consumeOpenControlsRequestFromUrl() {
@@ -379,8 +435,21 @@ function renderControls() {
     clearSlotButton.innerHTML = ICONS.clear;
 
     row.append(inputShell, clearSlotButton);
-    wrapper.append(labelRow, row);
+    const playbackRow = document.createElement("div");
+    playbackRow.className = "slot-playback-row";
+    const playbackStatus = document.createElement("span");
+    playbackStatus.dataset.playbackStatus = String(index);
+    playbackStatus.setAttribute("aria-live", "polite");
+    const retryButton = document.createElement("button");
+    retryButton.type = "button";
+    retryButton.className = "retry-button";
+    retryButton.dataset.retrySlot = String(index);
+    retryButton.textContent = t("retry");
+    retryButton.setAttribute("aria-label", t("retryPane", { number: index + 1 }));
+    playbackRow.append(playbackStatus, retryButton);
+    wrapper.append(labelRow, row, playbackRow);
     slotControls.append(wrapper);
+    updateSlotPlaybackStatus(index);
   }
 
   layoutButtons.forEach((button) => {
@@ -466,6 +535,23 @@ function updateSlotTitle(index) {
 
   title.textContent = state.slots[index].title;
   title.title = state.slots[index].title;
+}
+
+function updateSlotPlaybackStatus(index) {
+  const status = slotControls.querySelector(`[data-playback-status="${index}"]`);
+  if (!status) return;
+  const slot = state.slots[index];
+  const tile = stage.querySelector(`[data-tile="${index}"]`);
+  const inactive = index >= state.layout;
+  const key = inactive ? "idle" : !slot.url.trim() ? "noSource" :
+    tile?.dataset.sourceUrl !== slot.url ? "sourcePending" : tile.dataset.status || "sourceLoading";
+  status.textContent = t(key);
+  slotControls.querySelector(`[data-retry-slot="${index}"]`).disabled = inactive || !slot.url.trim();
+}
+
+function setTileStatus(tile, status) {
+  tile.dataset.status = status;
+  updateSlotPlaybackStatus(Number(tile.dataset.tile));
 }
 
 function startSlotDrag(event) {
@@ -599,6 +685,8 @@ function swapRenderedStageTiles(fromIndex, toIndex) {
 
   retargetStageTile(fromTile, toIndex);
   retargetStageTile(toTile, fromIndex);
+  updateSlotPlaybackStatus(fromIndex);
+  updateSlotPlaybackStatus(toIndex);
   notifyTileFramesOfViewportChange("layout");
   return true;
 }
@@ -625,76 +713,112 @@ function retargetStageTile(tile, index) {
 }
 
 async function renderStage() {
-  const currentRenderToken = ++renderToken;
   const layout = state.layout;
   const slots = state.slots.slice(0, layout).map((slot) => ({ url: slot.url }));
   const existingTiles = new Map(
     Array.from(stage.querySelectorAll("[data-tile]")).map((tile) => [Number(tile.dataset.tile), tile])
   );
-  const plans = await Promise.all(slots.map(async (slot, index) => {
-    const tile = existingTiles.get(index);
-    const sourceMatches = tile?.dataset.sourceUrl === slot.url;
-    const hasFrame = Boolean(tile?.querySelector("iframe[data-tile-frame]"));
-    const hasEmptyState = Boolean(tile?.querySelector(".tile-empty"));
-    const hasCurrentError = Boolean(
-      tile?.querySelector(".tile-error") && tile.dataset.language === state.language
-    );
-
-    if (sourceMatches && (hasFrame || (!slot.url.trim() && hasEmptyState) || hasCurrentError)) {
-      return { embed: null, reuse: true, slot, tile };
-    }
-
-    return {
-      embed: slot.url.trim() ? await resolveEmbed(slot.url) : null,
-      reuse: false,
-      slot,
-      tile
-    };
-  }));
-
-  if (currentRenderToken !== renderToken) {
-    return;
-  }
-
   stage.className = `stage layout-${layout}`;
   fixedViewportObserver.disconnect();
   stage.querySelectorAll("[data-splitter]").forEach((splitter) => splitter.remove());
   stage.querySelectorAll("[data-tile]").forEach((tile) => {
     if (Number(tile.dataset.tile) >= layout) {
+      disposeTileLoad(tile);
       tile.remove();
     }
   });
 
-  plans.forEach(({ embed, reuse, slot, tile: existingTile }, index) => {
+  const loads = slots.map((slot, index) => {
+    const existingTile = existingTiles.get(index);
     const tile = existingTile || document.createElement("article");
     tile.classList.add("tile");
     retargetStageTile(tile, index);
+    if (!existingTile) stage.append(tile);
+    const reuse = tile.dataset.sourceUrl === slot.url;
+    if (!reuse) disposeTileLoad(tile);
     tile.dataset.sourceUrl = slot.url;
-    tile.dataset.language = state.language;
 
-    if (reuse) {
-      const iframe = tile.querySelector("iframe[data-tile-frame]");
-      if (iframe) {
-        iframe.title = t("pane", { number: index + 1 });
-      } else if (!slot.url.trim()) {
-        tile.replaceChildren(createEmptyState(index));
-      }
-    } else if (!slot.url.trim()) {
+    if (!slot.url.trim()) {
       tile.replaceChildren(createEmptyState(index));
-    } else if (!embed.ok) {
-      tile.replaceChildren(createErrorState(embed.message));
-    } else {
-      tile.replaceChildren(createTileFrame(index, embed, slot.url));
+      setTileStatus(tile, "noSource");
+      return;
     }
-
-    if (!existingTile) {
-      stage.append(tile);
+    if (reuse && tile.querySelector("iframe[data-tile-frame]")) {
+      updateSlotPlaybackStatus(index);
+      return;
     }
+    if (reuse && tileLoads.has(tile)) {
+      updateSlotPlaybackStatus(index);
+      return tileLoads.get(tile).promise;
+    }
+    if (reuse && tile.querySelector(".tile-error")) {
+      tile.replaceChildren(createErrorState(t(tile.dataset.status)));
+      updateSlotPlaybackStatus(index);
+      return;
+    }
+    return loadTileSource(tile, slot.url);
   });
 
   appendSplitters();
   applyStageSizing();
   observeFixedViewportShells();
+  for (let index = layout; index < SLOT_COUNT; index += 1) updateSlotPlaybackStatus(index);
+  // Each job installs its own result immediately; waiting here is only for
+  // callers that explicitly need all current jobs to finish.
+  await Promise.all(loads);
+}
+
+function disposeTileLoad(tile) {
+  tileLoads.delete(tile);
+  tile.querySelectorAll("iframe[data-tile-frame]").forEach(clearFrameLoadTimer);
+  const shell = tile.querySelector("[data-fixed-viewport]");
+  if (shell) fixedViewportObserver.unobserve(shell);
+}
+
+function loadTileSource(tile, sourceUrl) {
+  tile.replaceChildren();
+  setTileStatus(tile, "sourceResolving");
+  const job = {};
+  tileLoads.set(tile, job);
+  job.promise = (async () => {
+    try {
+      const embed = await resolveEmbed(sourceUrl);
+      if (tileLoads.get(tile) !== job || !tile.isConnected) return;
+      if (!embed.ok) {
+        tile.replaceChildren(createErrorState(embed.message));
+        setTileStatus(tile, embed.errorKey || "sourceFailed");
+        return;
+      }
+      const index = Number(tile.dataset.tile);
+      tile.replaceChildren(createTileFrame(index, embed, sourceUrl));
+      setTileStatus(tile, "sourceLoading");
+      const iframe = tile.querySelector("iframe[data-tile-frame]");
+      startFrameLoadTimer(iframe);
+      const shell = tile.querySelector("[data-fixed-viewport]");
+      if (shell) fixedViewportObserver.observe(shell);
+    } catch (error) {
+      if (tileLoads.get(tile) !== job || !tile.isConnected) return;
+      const key = error?.code === "sourceTimeout" ? "sourceTimeout" : "sourceFailed";
+      tile.replaceChildren(createErrorState(t(key)));
+      setTileStatus(tile, key);
+    } finally {
+      if (tileLoads.get(tile) === job) tileLoads.delete(tile);
+    }
+  })();
+  return job.promise;
+}
+
+function clearFrameLoadTimer(iframe) {
+  window.clearTimeout(frameLoadTimers.get(iframe));
+  frameLoadTimers.delete(iframe);
+}
+
+function startFrameLoadTimer(iframe) {
+  clearFrameLoadTimer(iframe);
+  frameLoadTimers.set(iframe, window.setTimeout(() => {
+    frameLoadTimers.delete(iframe);
+    if (iframe.isConnected) setTileStatus(iframe.closest("[data-tile]"), "sourceLoadUnconfirmed");
+  }, FRAME_LOAD_TIMEOUT_MS));
 }
 
 function createTileFrame(index, embed, sourceUrl) {
@@ -722,7 +846,14 @@ function createTileFrame(index, embed, sourceUrl) {
   iframe.loading = "eager";
   iframe.referrerPolicy = embed.referrerPolicy || "strict-origin-when-cross-origin";
   iframe.setAttribute("allowfullscreen", "true");
-  iframe.addEventListener("load", () => requestFrameTitle(iframe));
+  iframe.addEventListener("load", () => {
+    if (!iframe.isConnected) return;
+    clearFrameLoadTimer(iframe);
+    // A navigation within a frame starts a new page. Ask that page to confirm
+    // media state rather than retaining a previous document's "Playing" label.
+    setTileStatus(iframe.closest("[data-tile]"), "sourcePageLoaded");
+    requestFrameTitle(iframe);
+  });
 
   if (embed.fallbackSrc) {
     iframe.dataset.fallbackSrc = embed.fallbackSrc;
@@ -751,7 +882,20 @@ function fallbackFromYouTubeEmbed(event) {
   }
 
   delete iframe.dataset.fallbackSrc;
+  setTileStatus(iframe.closest("[data-tile]"), "sourceLoading");
+  startFrameLoadTimer(iframe);
   iframe.src = fallbackSrc;
+}
+
+function updatePlaybackFromFrame(event) {
+  const statuses = ["sourcePageLoaded", "sourcePlaying", "sourcePaused", "sourceBuffering", "sourceMediaError"];
+  if (!statuses.includes(event.data.status) || !/^https?:\/\//.test(event.origin)) return;
+  const iframe = Array.from(stage.querySelectorAll("iframe[data-tile-frame]")).find(
+    (candidate) => candidate.contentWindow === event.source
+  );
+  if (!iframe) return;
+  clearFrameLoadTimer(iframe);
+  setTileStatus(iframe.closest("[data-tile]"), event.data.status);
 }
 
 function updateTitleFromFrame(event) {
@@ -816,25 +960,71 @@ function syncStateFromForm() {
 }
 
 function openControls() {
+  if (controlOverlay.hidden) focusBeforeControls = document.activeElement;
   renderControls();
   controlOverlay.hidden = false;
+  appShell.inert = true;
   const firstInput = slotControls.querySelector("input");
   window.setTimeout(() => {
     requestFrameTitles();
-    firstInput?.focus();
+    if (!controlOverlay.hidden) firstInput?.focus();
   }, 0);
 }
 
 function closeControls() {
   controlOverlay.hidden = true;
+  appShell.inert = false;
   document.body.tabIndex = -1;
-  document.body.focus({ preventScroll: true });
+  const target = focusBeforeControls?.isConnected && !controlOverlay.contains(focusBeforeControls)
+    ? focusBeforeControls : document.body;
+  target.focus({ preventScroll: true });
+}
+
+function trapControlsFocus(event) {
+  const controls = Array.from(controlOverlay.querySelectorAll("button:not(:disabled), input:not(:disabled), [tabindex='0']"))
+    .filter((element) => element.getClientRects().length);
+  const first = controls[0];
+  const last = controls.at(-1);
+  if (!first) return;
+  if (event.shiftKey && (document.activeElement === first || !controlOverlay.contains(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !controlOverlay.contains(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function reloadAllTiles() {
-  Array.from(stage.querySelectorAll("iframe[data-tile-frame]")).forEach((iframe) => {
-    iframe.src = iframe.src;
+  void retryTiles(Array.from({ length: state.layout }, (_, index) => index));
+}
+
+async function retryTiles(indices) {
+  const reloadIndices = indices.filter((index) => Number.isInteger(index) && index >= 0 && index < state.layout);
+  // Capture the user's retry targets before yielding; layout/URL edits may
+  // happen while the worker is preparing the rules.
+  const targets = reloadIndices.map((index) => ({ index, url: state.slots[index].url }));
+  await ensureFrameHeaderRules();
+  const currentIndices = targets.filter(({ index, url }) => index < state.layout && state.slots[index].url === url)
+    .map(({ index }) => index);
+  if (!currentIndices.length) return;
+  currentIndices.forEach((index) => {
+    const url = parseUrl(state.slots[index].url);
+    if (url && isBilibiliHost(url.hostname)) bilibiliRoomIdCache.delete(getBilibiliLiveRoomId(url));
   });
+  void persistState(t("applied"));
+  await Promise.all(currentIndices.map((index) => {
+    const tile = stage.querySelector(`[data-tile="${index}"]`);
+    if (!tile) return;
+    disposeTileLoad(tile);
+    tile.dataset.sourceUrl = state.slots[index].url;
+    if (!tile.dataset.sourceUrl.trim()) {
+      tile.replaceChildren(createEmptyState(index));
+      setTileStatus(tile, "noSource");
+      return;
+    }
+    return loadTileSource(tile, tile.dataset.sourceUrl);
+  }));
 }
 
 function toggleFullscreen() {
@@ -881,7 +1071,27 @@ function createSplitter(axis) {
   splitter.title = axis === "col" ? t("dragWidth") : t("dragHeight");
   splitter.setAttribute("aria-label", splitter.title);
   splitter.setAttribute("aria-orientation", axis === "col" ? "vertical" : "horizontal");
+  splitter.setAttribute("role", "separator");
+  splitter.setAttribute("aria-valuemin", "18");
+  splitter.setAttribute("aria-valuemax", "82");
   return splitter;
+}
+
+function resizeWithKeyboard(event) {
+  const splitter = event.target.closest("[data-splitter]");
+  if (!splitter) return;
+  const axis = splitter.dataset.splitter;
+  const direction = axis === "col" ? { ArrowLeft: -1, ArrowRight: 1 } : { ArrowUp: -1, ArrowDown: 1 };
+  const sizes = state.sizes[`layout${state.layout}`];
+  let value = sizes[axis];
+  if (event.key === "Home") value = 18;
+  else if (event.key === "End") value = 82;
+  else if (direction[event.key]) value += direction[event.key] * (event.shiftKey ? 10 : 2);
+  else return;
+  event.preventDefault();
+  sizes[axis] = clamp(value, 18, 82);
+  applyStageSizing(axis);
+  void persistState(t("resized"));
 }
 
 function startResize(event) {
@@ -963,6 +1173,12 @@ function applyStageSizing(axis, notifyFrames = true) {
     stage.style.setProperty("--row-b", `${100 - row}fr`);
   }
 
+  stage.querySelectorAll("[data-splitter]").forEach((splitter) => {
+    const value = sizes[splitter.dataset.splitter];
+    splitter.setAttribute("aria-valuenow", String(value));
+    splitter.setAttribute("aria-valuetext", `${value}%`);
+  });
+
   if (notifyFrames) {
     notifyTileFramesOfViewportChange("layout");
   }
@@ -1021,11 +1237,11 @@ function flushTileFrameViewportChange() {
 async function resolveEmbed(rawUrl) {
   const parsed = parseUrl(rawUrl);
   if (!parsed) {
-    return { ok: false, message: t("enterCompleteUrl") };
+    return { ok: false, errorKey: "enterCompleteUrl", message: t("enterCompleteUrl") };
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    return { ok: false, message: t("httpOnly") };
+    return { ok: false, errorKey: "httpOnly", message: t("httpOnly") };
   }
 
   const youtubeEmbed = getYouTubeEmbedUrl(parsed);
@@ -1044,6 +1260,15 @@ async function resolveEmbed(rawUrl) {
       ok: true,
       src: bilibiliLivePlayer,
       referrerPolicy: "no-referrer-when-downgrade"
+    };
+  }
+
+  const huyaLivePlayer = getHuyaLivePlayerUrl(parsed);
+  if (huyaLivePlayer) {
+    return {
+      ok: true,
+      src: huyaLivePlayer,
+      referrerPolicy: "strict-origin-when-cross-origin"
     };
   }
 
@@ -1220,30 +1445,44 @@ async function resolveBilibiliLiveRoomId(roomId) {
 
   const request = fetchBilibiliLiveRoomId(roomId);
   bilibiliRoomIdCache.set(roomId, request);
-
-  const resolvedRoomId = await request;
-  bilibiliRoomIdCache.set(roomId, resolvedRoomId);
-  return resolvedRoomId;
+  try {
+    return await request;
+  } catch (error) {
+    // Do not let an older failed request remove a newer retry's cache entry.
+    if (bilibiliRoomIdCache.get(roomId) === request) bilibiliRoomIdCache.delete(roomId);
+    throw error;
+  }
 }
 
 async function fetchBilibiliLiveRoomId(roomId) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
   try {
     const apiUrl = new URL(BILIBILI_ROOM_INIT_ENDPOINT);
     apiUrl.searchParams.set("id", roomId);
 
     const response = await fetch(apiUrl.href, {
       credentials: "omit",
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
     if (!response.ok) {
-      return roomId;
+      throw new Error("Room lookup failed.");
     }
 
     const payload = await response.json();
     const resolvedRoomId = payload?.data?.room_id;
-    return isNumericId(resolvedRoomId) ? String(resolvedRoomId) : roomId;
-  } catch {
-    return roomId;
+    if ((payload.code !== undefined && payload.code !== 0) || !isNumericId(resolvedRoomId) || Number(resolvedRoomId) <= 0) {
+      throw new Error("Invalid room lookup response.");
+    }
+    return String(resolvedRoomId);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw Object.assign(new Error("Room lookup timed out."), { code: "sourceTimeout" });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
@@ -1270,7 +1509,14 @@ function isDirectMediaUrl(url) {
 }
 
 function getPathExtension(url) {
-  const path = decodeURIComponent(url.pathname || "").toLowerCase();
+  let path = url.pathname || "";
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // A URL can contain a literal '%' or incomplete UTF-8 escape sequence.
+    // Labels must never prevent the remaining sources from loading.
+  }
+  path = path.toLowerCase();
   const match = path.match(/\.([a-z0-9]+)$/);
   return match ? match[1] : "";
 }
@@ -1293,6 +1539,22 @@ function isYesLiveHost(hostname) {
 
 function isHuyaHost(hostname) {
   return hostname === "huya.com" || hostname.endsWith(".huya.com");
+}
+
+function getHuyaLivePlayerUrl(url) {
+  // Only room pages use the stand-alone player. Keep categories, videos,
+  // existing embeds, and other Huya services at their original URLs.
+  if (!["huya.com", "www.huya.com", "m.huya.com"].includes(url.hostname.toLowerCase())) {
+    return "";
+  }
+
+  const match = url.pathname.match(/^\/([a-zA-Z0-9]+)\/?$/);
+  if (!match || ["g", "l", "u", "search", "download", "index", "replay"].includes(match[1].toLowerCase())) {
+    return "";
+  }
+
+  // Huya's player resolves both numeric room IDs and private-host aliases.
+  return `https://liveshare.huya.com/iframe/${match[1]}`;
 }
 
 async function readState() {
@@ -1369,6 +1631,7 @@ function applyLanguage() {
   closeControlsButton.setAttribute("aria-label", t("close"));
   document.querySelector(".layout-switch").setAttribute("aria-label", t("paneCount"));
   syncFullscreenState();
+  updatePlaybackNotice();
 }
 
 function normalizeSizes(input) {
