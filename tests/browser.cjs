@@ -29,6 +29,11 @@ const os = require("node:os");
     await context.route(/^https?:\/\//, async (route) => {
       const url = new URL(route.request().url());
       if (url.hostname === "api.live.bilibili.com") {
+        if (url.pathname.endsWith("/get_info")) {
+          const roomId = Number(url.searchParams.get("room_id"));
+          await route.fulfill({ json: { code: 0, data: { room_id: roomId, title: `Room ${roomId}` } } });
+          return;
+        }
         heldRequests.set(url.searchParams.get("id"), route);
         return;
       }
@@ -38,7 +43,8 @@ const os = require("node:os");
         : '<div id="movie_player" style="width:640px;height:360px"><video></video></div>';
       if (url.hostname === "yeslivetv.com") player = '<div id="player" style="width:640px;height:360px"><video></video></div>';
       if (url.hostname === "liveshare.huya.com") player = huyaFixture;
-      await route.fulfill({ contentType: "text/html; charset=utf-8", body: `<!doctype html><title>Fixture stream</title><body style="margin:0;background:#151515;color:white">${player}</body>` });
+      const title = url.hostname === "www.bilibili.com" ? "Bilibili Live Activity Player" : "Fixture stream";
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: `<!doctype html><title>${title}</title><body style="margin:0;background:#151515;color:white">${player}</body>` });
     });
     const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
     const base = worker.url().split("/").slice(0, 3).join("/");
@@ -180,6 +186,9 @@ const os = require("node:os");
     await youtubePlayer.waitFor();
     assert.equal(await youtubePlayer.getAttribute("data-replaced"), "true");
     await helperPage.frameLocator('iframe[data-tile-frame="1"]').locator(".chrome-stream-layout-yeslive-primary").waitFor();
+    await require("./twitch-checks.cjs")(helperPage);
+    await require("./bilibili-checks.cjs")(helperPage);
+    await require("./kick-soop-checks.cjs")(helperPage);
     await require("./huya-checks.cjs")(context, helperPage);
     await helperPage.close();
     console.log("PASS: YouTube embed fallback, replaced player recovery, and YesLive promotion");

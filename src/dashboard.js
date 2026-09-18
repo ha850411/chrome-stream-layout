@@ -10,6 +10,7 @@ const SLOT_COUNT = 4;
 const SOURCE_RESOLVE_TIMEOUT_MS = 8000;
 const FRAME_LOAD_TIMEOUT_MS = 20000;
 const BILIBILI_ROOM_INIT_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/room_init";
+const BILIBILI_ROOM_INFO_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/get_info";
 const YESLIVE_THEATER_VIEWPORT = {
   width: 1920,
   height: 1080
@@ -927,6 +928,7 @@ function loadTileSource(tile, sourceUrl) {
       setTileStatus(tile, "sourceLoading");
       const iframe = tile.querySelector("iframe[data-tile-frame]");
       startFrameLoadTimer(iframe);
+      if (embed.bilibiliRoomId) void refreshBilibiliFrameTitle(iframe);
       const shell = tile.querySelector("[data-fixed-viewport]");
       if (shell) fixedViewportObserver.observe(shell);
     } catch (error) {
@@ -950,7 +952,10 @@ function startFrameLoadTimer(iframe) {
   clearFrameLoadTimer(iframe);
   frameLoadTimers.set(iframe, window.setTimeout(() => {
     frameLoadTimers.delete(iframe);
-    if (iframe.isConnected) setTileStatus(iframe.closest("[data-tile]"), "sourceLoadUnconfirmed");
+    if (!iframe.isConnected) return;
+    if (!fallbackFromTwitchEmbed(iframe)) {
+      setTileStatus(iframe.closest("[data-tile]"), "sourceLoadUnconfirmed");
+    }
   }, FRAME_LOAD_TIMEOUT_MS));
 }
 
@@ -974,6 +979,7 @@ function createTileFrame(index, embed, sourceUrl) {
   iframe.name = `chrome-stream-layout-pane-${index}`;
   iframe.dataset.tileFrame = String(index);
   iframe.dataset.sourceUrl = sourceUrl;
+  if (embed.bilibiliRoomId) iframe.dataset.bilibiliRoomId = embed.bilibiliRoomId;
   iframe.allow = "autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share";
   iframe.allowFullscreen = true;
   iframe.loading = "eager";
@@ -981,7 +987,13 @@ function createTileFrame(index, embed, sourceUrl) {
   iframe.setAttribute("allowfullscreen", "true");
   iframe.addEventListener("load", () => {
     if (!iframe.isConnected) return;
-    clearFrameLoadTimer(iframe);
+    // A blocked/blank iframe can still fire load. Keep Twitch's deadline until
+    // its content script confirms that an actual video element is present.
+    if (iframe.dataset.twitchFallbackSrc) {
+      if (!frameLoadTimers.has(iframe)) startFrameLoadTimer(iframe);
+    } else {
+      clearFrameLoadTimer(iframe);
+    }
     // A navigation within a frame starts a new page. Ask that page to confirm
     // media state rather than retaining a previous document's "Playing" label.
     setTileStatus(iframe.closest("[data-tile]"), "sourcePageLoaded");
@@ -991,6 +1003,7 @@ function createTileFrame(index, embed, sourceUrl) {
   if (embed.fallbackSrc) {
     iframe.dataset.fallbackSrc = embed.fallbackSrc;
   }
+  if (embed.twitchFallbackSrc) iframe.dataset.twitchFallbackSrc = embed.twitchFallbackSrc;
 
   if (embed.fixedViewport) {
     iframe.width = String(embed.fixedViewport.width);
@@ -1027,8 +1040,23 @@ function updatePlaybackFromFrame(event) {
     (candidate) => candidate.contentWindow === event.source
   );
   if (!iframe) return;
-  clearFrameLoadTimer(iframe);
+  if (event.data.status === "sourceMediaError" && fallbackFromTwitchEmbed(iframe)) return;
+  if (event.data.status !== "sourcePageLoaded" || !iframe.dataset.twitchFallbackSrc) {
+    clearFrameLoadTimer(iframe);
+  }
   setTileStatus(iframe.closest("[data-tile]"), event.data.status);
+}
+
+function fallbackFromTwitchEmbed(iframe) {
+  const fallbackSrc = iframe.dataset.twitchFallbackSrc;
+  if (!fallbackSrc || !iframe.isConnected) return false;
+  // One attempt per source load. A paused but initialized player cancels the
+  // deadline; an unavailable embed can recover through the normal room page.
+  delete iframe.dataset.twitchFallbackSrc;
+  setTileStatus(iframe.closest("[data-tile]"), "sourceLoading");
+  startFrameLoadTimer(iframe);
+  iframe.src = fallbackSrc;
+  return true;
 }
 
 function updateTitleFromFrame(event) {
@@ -1037,15 +1065,47 @@ function updateTitleFromFrame(event) {
   );
   if (!iframe) return;
 
+  const title = normalizePageTitle(event.data.title);
+  // The official Bilibili player reports its application name, not the room's
+  // title. It must not overwrite room metadata, including on iframe load or
+  // when reopening the source controls.
+  if (iframe.dataset.bilibiliRoomId && isGenericBilibiliTitle(title)) return;
+  setFrameSourceTitle(iframe, title);
+}
+
+function setFrameSourceTitle(iframe, value) {
+  if (!iframe.isConnected) return;
   const index = Number(iframe.dataset.tileFrame);
   const sourceUrl = iframe.dataset.sourceUrl || "";
   if (!Number.isInteger(index) || state.slots[index]?.url !== sourceUrl) return;
 
-  const title = normalizePageTitle(event.data.title);
+  const title = normalizePageTitle(value);
   if (state.slots[index].title === title) return;
 
   state.slots[index].title = title;
   updateSlotTitle(index);
+}
+
+function isGenericBilibiliTitle(title) {
+  return !title || /^Bilibili Live Activity Player$/i.test(title);
+}
+
+async function refreshBilibiliFrameTitle(iframe) {
+  const roomId = iframe.dataset.bilibiliRoomId;
+  const savedTitle = normalizePageTitle(state.slots[Number(iframe.dataset.tileFrame)]?.title);
+  if (isGenericBilibiliTitle(savedTitle)) {
+    const source = parseUrl(iframe.dataset.sourceUrl);
+    setFrameSourceTitle(iframe, `Bilibili · ${(source && getBilibiliLiveRoomId(source)) || roomId}`);
+  }
+  try {
+    const title = await fetchBilibiliLiveTitle(roomId);
+    // Resolve the pane's current position after the request: it may have been
+    // moved, replaced or removed while room metadata was loading.
+    setFrameSourceTitle(iframe, title);
+  } catch {
+    // Metadata is optional. Preserve a known title (or the room number) and
+    // leave playback/status alone; reloading this source retries the lookup.
+  }
 }
 
 function normalizePageTitle(value) {
@@ -1396,7 +1456,18 @@ async function resolveEmbed(rawUrl) {
     return {
       ok: true,
       src: bilibiliLivePlayer,
+      bilibiliRoomId: new URL(bilibiliLivePlayer).searchParams.get("cid"),
       referrerPolicy: "no-referrer-when-downgrade"
+    };
+  }
+
+  const twitchLivePlayer = getTwitchLivePlayerUrl(parsed);
+  if (twitchLivePlayer) {
+    return {
+      ok: true,
+      src: twitchLivePlayer,
+      twitchFallbackSrc: parsed.href,
+      referrerPolicy: "strict-origin-when-cross-origin"
     };
   }
 
@@ -1405,6 +1476,24 @@ async function resolveEmbed(rawUrl) {
     return {
       ok: true,
       src: huyaLivePlayer,
+      referrerPolicy: "strict-origin-when-cross-origin"
+    };
+  }
+
+  const kickLivePlayer = getKickLivePlayerUrl(parsed);
+  if (kickLivePlayer) {
+    return {
+      ok: true,
+      src: kickLivePlayer,
+      referrerPolicy: "strict-origin-when-cross-origin"
+    };
+  }
+
+  const soopLivePlayer = getSoopLivePlayerUrl(parsed);
+  if (soopLivePlayer) {
+    return {
+      ok: true,
+      src: soopLivePlayer,
       referrerPolicy: "strict-origin-when-cross-origin"
     };
   }
@@ -1519,6 +1608,8 @@ function getSourceLabel(rawUrl) {
   if (isBilibiliHost(hostname)) return "Bilibili";
   if (isYesLiveHost(hostname)) return "YesLive";
   if (isHuyaHost(hostname)) return "Huya";
+  if (isKickHost(hostname)) return "Kick";
+  if (isSoopHost(hostname)) return "SOOP";
   if (isDirectMediaUrl(parsed)) return getMediaLabel(parsed);
   return hostname || "URL";
 }
@@ -1623,6 +1714,29 @@ async function fetchBilibiliLiveRoomId(roomId) {
   }
 }
 
+async function fetchBilibiliLiveTitle(roomId) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
+  try {
+    const apiUrl = new URL(BILIBILI_ROOM_INFO_ENDPOINT);
+    apiUrl.searchParams.set("room_id", roomId);
+    const response = await fetch(apiUrl.href, {
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Room title lookup failed.");
+    const payload = await response.json();
+    const title = typeof payload?.data?.title === "string" ? normalizePageTitle(payload.data.title) : "";
+    if (payload.code !== 0 || String(payload?.data?.room_id) !== roomId || !title) {
+      throw new Error("Invalid room title response.");
+    }
+    return title;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function getBilibiliLiveRoomId(url) {
   const fromQuery = url.searchParams.get("roomId") || url.searchParams.get("room_id") || url.searchParams.get("cid");
   if (isNumericId(fromQuery)) {
@@ -1664,6 +1778,73 @@ function isYouTubeHost(hostname) {
 
 function isTwitchHost(hostname) {
   return hostname === "twitch.tv" || hostname.endsWith(".twitch.tv") || hostname === "player.twitch.tv";
+}
+
+function isKickHost(hostname) {
+  return hostname === "kick.com" || hostname.endsWith(".kick.com");
+}
+
+function getKickLivePlayerUrl(url) {
+  if (!["kick.com", "www.kick.com"].includes(url.hostname.toLowerCase())) return "";
+  // Clips can use a channel URL with a clip query; keep those and VOD routes.
+  if (url.searchParams.has("clip")) return "";
+  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)\/?$/);
+  const reserved = [
+    "about", "advertise", "auth", "browse", "categories", "category", "clips",
+    "community-guidelines", "dashboard", "dmca-policy", "download", "downloads",
+    "following", "forgot-password", "login", "logout", "privacy-policy", "safety",
+    "search", "security", "settings", "signup", "subscriptions", "terms-of-service"
+  ];
+  if (!match || reserved.includes(match[1].toLowerCase())) return "";
+  const embedUrl = new URL(`https://player.kick.com/${match[1].toLowerCase()}`);
+  for (const name of ["autoplay", "muted"]) {
+    embedUrl.searchParams.set(name, url.searchParams.get(name) === "false" ? "false" : "true");
+  }
+  return embedUrl.href;
+}
+
+function isSoopHost(hostname) {
+  return ["sooplive.com", "sooplive.co.kr", "afreecatv.com"].some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
+  );
+}
+
+function getSoopLivePlayerUrl(url) {
+  if (!["play.sooplive.com", "play.sooplive.co.kr", "play.afreecatv.com"].includes(url.hostname.toLowerCase())) return "";
+  // SOOP publishes /<channel>[/<broadcast number>]/embed as the live player.
+  // Keep the broadcast number, and leave VOD, chat and existing embeds alone.
+  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)(?:\/(\d+))?\/?$/);
+  if (!match) return "";
+  return `https://play.sooplive.com/${match[1]}${match[2] ? `/${match[2]}` : ""}/embed`;
+}
+
+function getTwitchLivePlayerUrl(url) {
+  // A channel's full page boots the navigation, recommendations and chat too.
+  // Only rewrite live channel URLs; keep clips, VODs and other Twitch pages.
+  if (!["twitch.tv", "www.twitch.tv", "m.twitch.tv"].includes(url.hostname.toLowerCase())) {
+    return "";
+  }
+
+  const match = url.pathname.match(/^\/([a-zA-Z0-9_]+)\/?$/);
+  const reserved = [
+    "activate", "bits", "collections", "communities", "creatorcamp", "dashboard",
+    "directory", "discover", "downloads", "drops", "embed", "following", "friends",
+    "inventory", "jobs", "login", "logout", "messages", "moderator", "p", "payments",
+    "popout", "prime", "products", "search", "settings", "signup", "store",
+    "subscriptions", "team", "teams", "turbo", "videos", "wallet"
+  ];
+  if (!match || reserved.includes(match[1].toLowerCase())) return "";
+
+  const embedUrl = new URL("https://player.twitch.tv/");
+  embedUrl.searchParams.set("channel", match[1].toLowerCase());
+  // Use the actual dashboard host, including unpacked extension IDs. The
+  // existing dashboard-only frame rules handle Twitch's HTTPS ancestor CSP.
+  embedUrl.searchParams.set("parent", new URL(location.href).hostname);
+  for (const name of ["autoplay", "muted"]) {
+    const value = url.searchParams.get(name);
+    embedUrl.searchParams.set(name, value === "false" ? "false" : "true");
+  }
+  return embedUrl.href;
 }
 
 function isBilibiliHost(hostname) {

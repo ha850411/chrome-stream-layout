@@ -13,6 +13,7 @@
   let lastReportedTitle = null;
   let lastMediaStatus = null;
   let titleTimer = 0;
+  let mediaTimer = 0;
   let discoveryTimer = 0;
   let suspended = false;
   let observedTitleNodes = [];
@@ -32,6 +33,35 @@
   // Only watch direct head children for replacement of title/meta elements.
   const headObserver = new MutationObserver(() => scheduleTitleReport());
   const discoveryObserver = new MutationObserver(() => scheduleTitleReport());
+  // A player may insert an empty, paused video after document_idle without
+  // firing any media events. Track video insertion/replacement so that this
+  // doesn't stay "playback unconfirmed" until the user presses Play.
+  const mediaObserver = new MutationObserver((records) => {
+    const hasVideo = (node) => node.nodeType === 1 &&
+      (node.matches("video") || Boolean(node.querySelector("video")));
+    if (records.some((record) => [...record.addedNodes, ...record.removedNodes].some(hasVideo))) {
+      scheduleMediaReport();
+    }
+  });
+
+  function scheduleMediaReport() {
+    if (suspended || mediaTimer) return;
+    mediaTimer = window.setTimeout(() => {
+      mediaTimer = 0;
+      reportMediaStatus();
+    }, 250);
+  }
+
+  function startMediaTracking() {
+    mediaObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    reportMediaStatus(null, true);
+  }
+
+  function stopMediaTracking() {
+    mediaObserver.disconnect();
+    window.clearTimeout(mediaTimer);
+    mediaTimer = 0;
+  }
 
   function stopDiscovery() {
     discoveryObserver.disconnect();
@@ -113,9 +143,10 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       startTitleTracking();
-      reportMediaStatus(null, true);
+      startMediaTracking();
     } else {
       stopDiscovery();
+      stopMediaTracking();
     }
   });
   window.addEventListener("pagehide", () => {
@@ -124,16 +155,17 @@
     headObserver.disconnect();
     observedTitleNodes = [];
     stopDiscovery();
+    stopMediaTracking();
     window.clearTimeout(titleTimer);
     titleTimer = 0;
   });
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       startTitleTracking();
-      reportMediaStatus(null, true);
+      startMediaTracking();
     }
   });
 
   startTitleTracking();
-  reportMediaStatus();
+  startMediaTracking();
 })();

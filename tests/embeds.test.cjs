@@ -35,6 +35,116 @@ function loadDashboard(overrides = {}) {
 
 const dashboard = loadDashboard();
 
+for (const [input, expected] of [
+  ["https://play.sooplive.com/afstar1", "https://play.sooplive.com/afstar1/embed"],
+  ["play.sooplive.com/afstar1/", "https://play.sooplive.com/afstar1/embed"],
+  ["http://play.sooplive.co.kr/afstar1/123456?from=share#live", "https://play.sooplive.com/afstar1/123456/embed"],
+  ["https://play.afreecatv.com/some_channel/123456/", "https://play.sooplive.com/some_channel/123456/embed"]
+]) {
+  test(`SOOP live URLs use the official embedded player: ${input}`, async () => {
+    const context = loadDashboard({ fetch: () => assert.fail("SOOP embeds must not require a lookup") });
+    assert.equal((await context.resolveEmbed(input)).src, expected);
+    assert.equal(context.getSourceLabel(input), "SOOP");
+  });
+}
+
+for (const input of [
+  "https://www.sooplive.com/", "https://play.sooplive.com/",
+  "https://ch.sooplive.com/afstar1", "https://vod.sooplive.com/player/123456",
+  "https://play.sooplive.com/afstar1/embed?mutePlay=false",
+  "https://play.sooplive.com/afstar1/123456/embed",
+  "https://play.sooplive.com/afstar1/chat", "https://play.sooplive.com/afstar1/123456/chat",
+  "https://play.sooplive.com/afstar1%2Fembed", "https://play.sooplive.com.example.org/afstar1",
+  "https://play.sooplive.com@other.example/afstar1"
+]) {
+  test(`SOOP non-live URLs remain unchanged: ${input}`, async () => {
+    assert.equal((await dashboard.resolveEmbed(input)).src, new URL(input).href);
+  });
+}
+
+for (const input of [
+  "https://kick.com/starladder", "http://www.kick.com/starladder/",
+  "kick.com/STARLADDER?ref=share#live"
+]) {
+  test(`Kick channel uses its official player: ${input}`, async () => {
+    const context = loadDashboard({ fetch: () => assert.fail("Kick embeds must not require a lookup") });
+    const result = await context.resolveEmbed(input);
+    assert.equal(result.src, "https://player.kick.com/starladder?autoplay=true&muted=true");
+    assert.equal(context.getSourceLabel(input), "Kick");
+  });
+}
+
+test("Kick preserves explicit playback preferences and supports channel punctuation", async () => {
+  const result = await dashboard.resolveEmbed("https://kick.com/some_channel-1?autoplay=false&muted=false");
+  assert.equal(result.src, "https://player.kick.com/some_channel-1?autoplay=false&muted=false");
+});
+
+for (const input of [
+  "https://kick.com/", "https://kick.com/categories", "https://kick.com/search?query=cs2",
+  "https://kick.com/terms-of-service", "https://kick.com/starladder/videos/123456",
+  "https://kick.com/starladder?clip=clip_123", "https://kick.com/starladder/clips",
+  "https://player.kick.com/starladder?muted=false", "https://help.kick.com/article",
+  "https://kick.com/starladder%2Fvideos", "https://kick.com.example.org/starladder",
+  "https://kick.com@other.example/starladder"
+]) {
+  test(`Kick non-live URLs remain unchanged: ${input}`, async () => {
+    assert.equal((await dashboard.resolveEmbed(input)).src, new URL(input).href);
+  });
+}
+
+for (const input of [
+  "https://www.twitch.tv/roger9527",
+  "http://twitch.tv/roger9527/",
+  "www.twitch.tv/roger9527",
+  "https://m.twitch.tv/ROGER9527?tt_content=channel#player"
+]) {
+  test(`Twitch live channel uses the player and actual dashboard parent: ${input}`, async () => {
+    const context = loadDashboard({ fetch: () => assert.fail("Twitch routing must not wait for a network lookup") });
+    const result = await context.resolveEmbed(input);
+    const url = new URL(result.src);
+    assert.equal(result.ok, true);
+    assert.equal(url.origin, "https://player.twitch.tv");
+    assert.equal(url.pathname, "/");
+    assert.equal(url.searchParams.get("channel"), "roger9527");
+    assert.equal(url.searchParams.get("parent"), "test-extension");
+    assert.equal(url.searchParams.get("autoplay"), "true");
+    assert.equal(url.searchParams.get("muted"), "true");
+    assert.equal(url.searchParams.has("tt_content"), false);
+  });
+}
+
+test("Twitch respects explicit playback options and derives the parent without a port or scheme", async () => {
+  const context = loadDashboard({ location: { href: "https://layout.example:8443/dashboard.html" } });
+  const result = await context.resolveEmbed("https://www.twitch.tv/some_channel?autoplay=false&muted=false");
+  const url = new URL(result.src);
+  assert.equal(url.searchParams.get("channel"), "some_channel");
+  assert.equal(url.searchParams.get("parent"), "layout.example");
+  assert.equal(url.searchParams.get("autoplay"), "false");
+  assert.equal(url.searchParams.get("muted"), "false");
+});
+
+for (const input of [
+  "https://www.twitch.tv/",
+  "https://www.twitch.tv/directory",
+  "https://www.twitch.tv/DIRECTORY/",
+  "https://www.twitch.tv/downloads",
+  "https://www.twitch.tv/search?term=roger9527",
+  "https://www.twitch.tv/settings",
+  "https://www.twitch.tv/videos/123456789?t=1h2m3s",
+  "https://www.twitch.tv/roger9527/videos",
+  "https://www.twitch.tv/roger9527/clip/SomeClip",
+  "https://www.twitch.tv/popout/roger9527/chat",
+  "https://clips.twitch.tv/SomeClip",
+  "https://player.twitch.tv/?channel=roger9527&parent=example.org&muted=false",
+  "https://www.twitch.tv/roger%2F9527",
+  "https://www.twitch.tv.example.org/roger9527",
+  "https://twitch.tv@other.example/roger9527"
+]) {
+  test(`Twitch non-channel URLs are preserved: ${input}`, async () => {
+    assert.equal((await dashboard.resolveEmbed(input)).src, new URL(input).href);
+  });
+}
+
 for (const [input, room] of [
   ["https://www.huya.com/660000", "660000"],
   ["http://huya.com/660000/", "660000"],
@@ -89,6 +199,7 @@ test("Bilibili short room IDs still resolve to its live player", async () => {
   assert.equal(url.pathname, "/blackboard/live/live-activity-player.html");
   assert.equal(url.searchParams.get("cid"), "22625025");
   assert.equal(url.searchParams.get("danmaku"), "1");
+  assert.equal(result.bilibiliRoomId, "22625025");
 });
 
 test("YesLive retains its fixed viewport", async () => {
@@ -162,4 +273,49 @@ test("A lookup timeout aborts the request and allows another attempt", async () 
   }
   assert.equal(calls, 2);
   assert.equal(aborted, 2);
+});
+
+test("Bilibili titles use room metadata and normalize whitespace", async () => {
+  const context = loadDashboard({ fetch: async (input, options) => {
+    const url = new URL(input);
+    assert.equal(url.pathname, "/room/v1/Room/get_info");
+    assert.equal(url.searchParams.get("room_id"), "7734200");
+    assert.equal(options.credentials, "omit");
+    assert.equal(options.cache, "no-store");
+    return { ok: true, json: async () => ({ code: 0, data: { room_id: 7734200, title: "  【直播】WE\n vs   JDG  " } }) };
+  } });
+  assert.equal(await context.fetchBilibiliLiveTitle("7734200"), "【直播】WE vs JDG");
+});
+
+test("Bilibili metadata rejects failures, missing titles and titles for another room", async () => {
+  for (const payload of [
+    { code: -400 }, {},
+    { code: 0, data: { room_id: 7734200, title: "  " } },
+    { code: 0, data: { room_id: 7734200, title: { invalid: true } } },
+    { code: 0, data: { room_id: 35, title: "Wrong room" } }
+  ]) {
+    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => payload }) });
+    await assert.rejects(context.fetchBilibiliLiveTitle("7734200"));
+  }
+  const context = loadDashboard({ fetch: async () => ({ ok: false }) });
+  await assert.rejects(context.fetchBilibiliLiveTitle("7734200"));
+});
+
+test("Bilibili title lookups abort on timeout and fetch a fresh title on retry", async () => {
+  let calls = 0;
+  let aborted = false;
+  const context = loadDashboard({
+    window: { setTimeout: (fn) => setTimeout(fn, 5), clearTimeout },
+    fetch: async (_url, { signal }) => {
+      if (++calls > 1) return { ok: true, json: async () => ({ code: 0, data: { room_id: 7734200, title: `Title ${calls}` } }) };
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+        aborted = true;
+        reject(new Error("aborted"));
+      }, { once: true }));
+    }
+  });
+  await assert.rejects(context.fetchBilibiliLiveTitle("7734200"));
+  assert.equal(aborted, true);
+  assert.equal(await context.fetchBilibiliLiveTitle("7734200"), "Title 2");
+  assert.equal(await context.fetchBilibiliLiveTitle("7734200"), "Title 3");
 });
