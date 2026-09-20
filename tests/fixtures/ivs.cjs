@@ -15,12 +15,15 @@ module.exports = function installIVSFixture() {
       const paint = () => { canvas.getContext('2d').fillStyle = '#183445'; canvas.getContext('2d').fillRect(0, 0, canvas.width, canvas.height); };
       const player = {
         destroyed: false,
+        playCalls: 0,
+        sizeUpdates: [],
         fail(error) { emit('Error', error); },
         stall() { clearInterval(timer); video.pause(); emit('Buffering'); },
         addEventListener: (name, fn) => handlers.set(name, fn),
         removeEventListener: (name) => handlers.delete(name),
         attachHTMLVideoElement(v) { video = v; },
-        setLiveLowLatencyEnabled() {}, setRebufferToLive() {}, setAutoMaxVideoSize() {},
+        setLiveLowLatencyEnabled() {}, setRebufferToLive() {},
+        setAutoMaxVideoSize(width, height) { this.sizeUpdates.push([width, height]); },
         setAutoplay(value) { auto = value; },
         setMuted(value) { video.muted = value; },
         setVolume(value) { video.volume = value; },
@@ -35,7 +38,7 @@ module.exports = function installIVSFixture() {
           if (!stream) { paint(); stream = canvas.captureStream(10); video.srcObject = stream; timer = setInterval(paint, 100); }
           queueMicrotask(() => { emit('Ready'); if (auto) this.play(); });
         },
-        play() { paused = false; void video.play().then(() => emit('Playing')).catch(() => emit('Blocked')); },
+        play() { this.playCalls++; paused = false; void video.play().then(() => emit('Playing')).catch(() => emit('Blocked')); },
         pause() { paused = true; video.pause(); },
         delete() { this.destroyed = true; clearInterval(timer); stream?.getTracks().forEach(t => t.stop()); video.pause(); video.srcObject = null; handlers.clear(); }
       };

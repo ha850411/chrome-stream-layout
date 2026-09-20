@@ -47,6 +47,38 @@ module.exports = async function checkKickSoop(page) {
   assert.equal(await page.locator('[data-slot-title="0"]').textContent(), "Kick match 1");
   assert.deepEqual(await kick().locator('#video').evaluate(v => [v.controls, v.muted]), [false, true]);
   assert.equal(await page.evaluate(() => typeof IVSPlayer), "undefined");
+  assert.equal(await body().evaluate(() => ivsFixture.instances[0].playCalls), 1, 'autoplay must start only once');
+  const pointerMutations = await body().evaluate(() => {
+    hideControls();
+    const observer = new MutationObserver(() => {});
+    observer.observe(surface, { attributes: true, attributeFilter: ['class'] });
+    for (let i = 0; i < 120; i++) surface.dispatchEvent(new PointerEvent('pointermove'));
+    const count = observer.takeRecords().length;
+    observer.disconnect();
+    return count;
+  });
+  assert.equal(pointerMutations, 1, 'pointer activity should reveal controls once, then only extend the idle deadline');
+  const resizeWork = await body().evaluate(async () => {
+    const player = ivsFixture.instances[0];
+    surface.style.width = '640px';
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const before = player.sizeUpdates.length;
+    const start = performance.now();
+    for (let i = 1; i <= 60; i++) {
+      surface.style.width = `${640 + i}px`;
+      await new Promise(requestAnimationFrame);
+    }
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const updates = player.sizeUpdates.slice(before);
+    const result = { updates: updates.length, last: updates.at(-1),
+      expected: [surface.clientWidth, surface.clientHeight], elapsed: performance.now() - start };
+    surface.style.removeProperty('width');
+    return result;
+  });
+  assert.ok(resizeWork.updates > 0 && resizeWork.updates <= Math.ceil(resizeWork.elapsed / 250) + 1,
+    `resize work must be bounded: ${JSON.stringify(resizeWork)}`);
+  assert.deepEqual(resizeWork.last, resizeWork.expected, 'Auto must receive the final pane size');
+  console.log(`PASS: autoplay starts once; 120 pointer events produce ${pointerMutations} class mutation; 60 resizes produce ${resizeWork.updates} SDK updates`);
   // Establish a pointer transition in the new frame before checking leave;
   // the previous platform checks may leave the pointer at the same coordinate.
   await reveal(); await page.mouse.move(1400, 950); await waitToolbar(false);

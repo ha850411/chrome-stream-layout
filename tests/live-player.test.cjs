@@ -8,6 +8,8 @@ const vm = require("node:vm");
 function setup(supported = true) {
   const events = new Map();
   const calls = [];
+  const timers = new Map();
+  let time = 0, nextTimer = 0;
   const player = {
     addEventListener(name, fn) { events.set(name, fn); },
     removeEventListener(name, fn) { if (events.get(name) === fn) events.delete(name); },
@@ -19,14 +21,28 @@ function setup(supported = true) {
   const sdk = { isPlayerSupported: supported, create(config) { calls.push(["create", config]); return player; },
     PlayerState: { READY: "ready", PLAYING: "playing", BUFFERING: "buffering", ENDED: "ended" },
     PlayerEventType: { ERROR: "error", PLAYBACK_BLOCKED: "blocked" } };
-  const context = vm.createContext({ IVSPlayer: sdk, chrome: { runtime: { getURL: (s) => `chrome-extension://test/${s}` } } });
+  const context = vm.createContext({ IVSPlayer: sdk, chrome: { runtime: { getURL: (s) => `chrome-extension://test/${s}` } },
+    window: {
+      setTimeout(fn, delay) { timers.set(++nextTimer, { fn, at: time + delay }); return nextTimer; },
+      clearTimeout(id) { timers.delete(id); }
+    }
+  });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/live-engine.js"), "utf8"), context);
   const notifications = [];
   const create = () => context.createLiveEngine({}, {
     qualities: (options, selected) => notifications.push({ options, selected }),
     status: (status) => notifications.push(status), error: (error) => notifications.push(error)
   });
-  return { create, events, calls, notifications, context };
+  const advance = (duration) => {
+    const target = time + duration;
+    for (;;) {
+      const next = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+      if (!next || next[1].at > target) break;
+      time = next[1].at; timers.delete(next[0]); next[1].fn();
+    }
+    time = target;
+  };
+  return { create, events, calls, notifications, context, timers, advance };
 }
 
 test("IVS reuses one instance across fresh signed URLs and preserves volume/mute changes", () => {
@@ -100,4 +116,68 @@ test("SDK errors preserve actionable categories without exposing tokens or signe
   assert.equal(r.context.describeLiveError({ type: "ErrorNotSupported" }).retryable, false);
   assert.equal(r.context.describeLiveError({ type: "ErrorNetwork", code: 429 }).retryAfterMs, 30000);
   r.events.get("ended")(); assert.equal(r.notifications.at(-1).kind, "ended");
+});
+
+test("Autoplay starts through the SDK without a second play request on READY", () => {
+  const r = setup(); const engine = r.create();
+  engine.load({ src: "https://stream.example/live.m3u8" });
+  r.events.get("ready")();
+  assert.deepEqual(r.calls.filter(([name]) => name === "setAutoplay"), [["setAutoplay", true]]);
+  assert.equal(r.calls.filter(([name]) => name === "play").length, 0);
+});
+
+test("Continuous pane resizing coalesces worker updates and applies the final dimensions", () => {
+  const r = setup(); const engine = r.create();
+  engine.resize(640, 360);
+  const caps = () => r.calls.filter(([name]) => name === "setAutoMaxVideoSize");
+  assert.deepEqual(caps(), [["setAutoMaxVideoSize", 640, 360]]);
+  for (let i = 1; i <= 120; i++) {
+    engine.resize(640 + i, 360 + i);
+    r.advance(16);
+  }
+  r.advance(250);
+  assert.ok(caps().length <= 9, `expected at most 9 updates, got ${caps().length}`);
+  assert.deepEqual(caps().at(-1), ["setAutoMaxVideoSize", 760, 480]);
+  assert.equal(r.timers.size, 0);
+});
+
+test("Unchanged, subpixel-equivalent and invalid dimensions do not wake the worker", () => {
+  const r = setup(); const engine = r.create();
+  engine.resize(639.2, 359.2);
+  for (let i = 0; i < 50; i++) engine.resize(639.8, 359.8);
+  for (const [width, height] of [[0, 0], [-1, 360], [NaN, 360], [640, Infinity]]) engine.resize(width, height);
+  r.advance(1000);
+  assert.deepEqual(r.calls.filter(([name]) => name === "setAutoMaxVideoSize"), [["setAutoMaxVideoSize", 640, 360]]);
+  assert.equal(r.timers.size, 0);
+});
+
+test("A new source immediately receives the latest cap; resizing preserves manual quality", () => {
+  const r = setup(); const engine = r.create();
+  engine.resize(640, 360);
+  engine.load({ src: "https://stream.example/first.m3u8", quality: "1080p60" });
+  r.events.get("ready")();
+  engine.resize(1280, 720);
+  engine.load({ src: "https://stream.example/second.m3u8", quality: "1080p60" });
+  r.events.get("ready")();
+  const caps = () => r.calls.filter(([name]) => name === "setAutoMaxVideoSize");
+  assert.deepEqual(caps().at(-1), ["setAutoMaxVideoSize", 1280, 720]);
+  const count = caps().length;
+  r.advance(1000);
+  assert.equal(caps().length, count);
+  assert.equal(r.calls.filter(([name]) => name === "setQuality").length, 2);
+  assert.equal(r.calls.some(([name]) => name === "setAutoQualityMode"), false);
+  engine.load({ src: "https://stream.example/third.m3u8" });
+  r.events.get("ready")();
+  assert.equal(caps().length, count + 1, "each source must receive its cap even at the same size");
+});
+
+test("Removing a player cancels pending resize work and ignores a detached callback", () => {
+  const r = setup(); const engine = r.create();
+  engine.resize(640, 360);
+  engine.resize(1280, 720);
+  assert.equal(r.timers.size, 1);
+  const late = [...r.timers.values()][0].fn;
+  engine.destroy(); late(); engine.resize(1920, 1080); r.advance(1000);
+  assert.equal(r.timers.size, 0);
+  assert.deepEqual(r.calls.filter(([name]) => name === "setAutoMaxVideoSize"), [["setAutoMaxVideoSize", 640, 360]]);
 });

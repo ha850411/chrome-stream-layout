@@ -26,15 +26,32 @@ function createLiveEngine(video, callbacks) {
   let autoplay = true;
   let initial = true;
   let size = { width: 0, height: 0 };
+  let appliedSize;
+  let resizeTimer = 0;
   const listeners = [];
   const on = (event, callback) => {
     const guarded = (...args) => { if (!disposed) callback(...args); };
     listeners.push([event, guarded]);
     player.addEventListener(event, guarded);
   };
+  const applySize = (force = false) => {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = 0;
+    if (disposed || !size.width || !size.height) return;
+    if (!force && appliedSize?.width === size.width && appliedSize?.height === size.height) return;
+    player.setAutoMaxVideoSize(size.width, size.height);
+    appliedSize = size;
+  };
   const resize = (width, height) => {
+    if (disposed || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    width = Math.ceil(width);
+    height = Math.ceil(height);
+    if (size.width === width && size.height === height) return;
     size = { width, height };
-    if (!disposed && width > 0 && height > 0) player.setAutoMaxVideoSize(Math.ceil(width), Math.ceil(height));
+    // Each SDK call posts to its WASM worker. Keep the first cap immediate,
+    // then send only the latest dimensions during a continuous splitter drag.
+    if (!appliedSize) applySize();
+    else if (!resizeTimer) resizeTimer = window.setTimeout(() => applySize(), 250);
   };
   const setQuality = (value) => {
     if (disposed) return;
@@ -55,11 +72,12 @@ function createLiveEngine(video, callbacks) {
       unique.set(value, { value, label: value, quality });
     }
     qualities = [...unique.values()].sort((a, b) => b.quality.height - a.quality.height || b.quality.framerate - a.quality.framerate);
-    resize(size.width, size.height);
+    // A fresh stream must receive its cap even if the pane did not resize.
+    applySize(true);
     setQuality(selected);
     callbacks.qualities(qualities, selected);
-    if (autoplay) player.play();
-    else callbacks.status("sourcePaused");
+    // setAutoplay already starts playback; another play() sends duplicate work.
+    if (!autoplay) callbacks.status("sourcePaused");
   });
   on(IVSPlayer.PlayerState.PLAYING, () => callbacks.status("sourcePlaying"));
   on(IVSPlayer.PlayerState.BUFFERING, () => callbacks.status("sourceBuffering"));
@@ -87,6 +105,8 @@ function createLiveEngine(video, callbacks) {
     destroy() {
       if (disposed) return;
       disposed = true;
+      window.clearTimeout(resizeTimer);
+      resizeTimer = 0;
       for (const [event, callback] of listeners) player.removeEventListener(event, callback);
       player.delete();
     }

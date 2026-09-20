@@ -46,7 +46,8 @@ function checkIdle() {
   else if (!toolbar.matches(":hover") && !toolbarHasFocus()) hideControls();
 }
 function showControls() {
-  surface.classList.add("player-controls-visible");
+  // Pointer movement only extends the deadline once the controls are visible.
+  if (!surface.classList.contains("player-controls-visible")) surface.classList.add("player-controls-visible");
   idleDeadline = performance.now() + 2200;
   if (!idleTimer) idleTimer = window.setTimeout(checkIdle, 2200);
 }
@@ -136,7 +137,9 @@ on(surface, "keydown", (event) => {
   else if (event.key.toLowerCase() === "f") void toggleFullscreen();
   else if (event.key.toLowerCase() === "l") goLive();
 });
-const resize = new ResizeObserver(() => engine?.resize(surface.clientWidth, surface.clientHeight));
+const resize = new ResizeObserver(([entry]) => {
+  if (entry) engine?.resize(entry.contentRect.width, entry.contentRect.height);
+});
 resize.observe(surface);
 
 window.livePlayer = {

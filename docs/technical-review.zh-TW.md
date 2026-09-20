@@ -151,6 +151,20 @@ Twitch／Kick 每個窗格由 `src/live-recovery.js` 管理自己的恢復狀態
 
 SDK 錯誤保留經篩選的類型、數值代碼與來源元件，區分授權、網路及媒體錯誤；原始錯誤字串可能包含簽章網址，因此不保留。這次新增的模擬時鐘測試涵蓋退避、停止條件、斷網、背景／睡眠、影格凍結、額度恢復及取消。瀏覽器回歸另外使用實際 MV3 頁面與 canvas SDK 替身驗證重建、來源更新、設定保留及窗格隔離。真實廣告轉場與跨 token 期限的長時間觀看仍需另行實測；此機制不會生成 Client-Integrity 或跳過平台授權。
 
+## 自製播放器效能檢查（2026-09-21）
+
+確認並改善三項不必要的操作：
+
+- 分隔線拖曳會透過 ResizeObserver，幾乎每個畫面更新都呼叫 `setAutoMaxVideoSize()`；目前 SDK 每次呼叫都會傳訊息給 WASM worker。現在合併 250 ms 內的尺寸變化，略過相同整數尺寸；首次設定及新來源 READY 時立即套用最新上限，移除播放器時取消待處理更新。ResizeObserver 直接使用回報的尺寸，避免再讀取元素尺寸。手動畫質選擇不受影響。
+- 原本同時使用 `setAutoplay(true)` 與 READY 時呼叫 `play()`。依 [IVS 1.56.1 API 文件](https://aws.github.io/amazon-ivs-player-docs/1.56.1/web/interfaces/Player.html#play)，啟用 autoplay 後不需要再次呼叫 play；現在只由 SDK 自動播放，保留明確停用 autoplay 的行為。
+- 每次 pointermove 都對控制列重複加入相同 class。現在只有從隱藏轉為顯示時更新 class；後續活動只延長既有的隱藏期限。
+
+新增離線回歸以每 16 ms 改變尺寸一次、連續 120 次的情境重現問題：包含初始尺寸的 SDK 更新由 121 次降至最多 9 次，且最後尺寸正確。另驗證重複尺寸、新串流重新套用、手動畫質及銷毀後取消更新。瀏覽器回歸使用真實 ResizeObserver 與 canvas SDK fixture，檢查連續縮放的呼叫上限、120 次 pointermove 僅產生一次 class 變更，以及每次載入只啟動一次播放。
+
+155 項離線測試與完整瀏覽器回歸通過；本次瀏覽器執行中，60 次逐畫面縮放合併為 4 次 SDK 尺寸更新。另以正式 SDK、真實 Twitch `roger9527` 雙窗格驗證：30 秒播放時間及影格持續增加，沒有新增 waiting；手動畫質／Auto、暫停恢復、三次 LIVE、音量保留、全螢幕及停用 autoplay 均通過，移除窗格後 worker 依序為 2 → 1 → 0。
+
+這些數字衡量的是引擎呼叫與 DOM 更新次數，不能換算為整體 CPU 或記憶體節省比例。原本已有單一引擎重用、移除 iframe 以釋放 worker、有限次數斷線恢復；本次保留這些行為。多路高解析度串流的解碼成本，以及長時間實播的 CPU／GPU／完整記憶體用量，仍需在實際裝置量測。
+
 ## Bilibili 來源標題（2026-09-18）
 
 官方嵌入播放器的 `document.title` 固定為 `Bilibili Live Activity Player`，並非直播間標題。解析房號並建立播放器後，現在另外以 `room/v1/Room/get_info?room_id=實際房號` 在背景取得 `data.title`，且忽略播放器回報的通用名稱與空標題。標題查詢最多等待 8 秒，失敗時保留已知標題或顯示 `Bilibili · 房號`，不阻塞播放或把來源標記為失敗；重新載入來源會重新查詢。
