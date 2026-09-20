@@ -26,11 +26,18 @@ function loadDashboard(overrides = {}) {
     // Hold UI initialization at its first storage read; exercise the real
     // routing functions without constructing a dashboard DOM or using network.
     chrome: { storage: { local: { get: () => new Promise(() => {}) } } },
-    fetch: async (url) => ({ ok: true, json: async () => new URL(url).hostname === "kick.com"
-      ? { livestream: { session_title: "Live match" }, playback_url: "https://stream.example/live.m3u8?token=original" }
-      : { data: { room_id: 22625025 } } }),
+    fetch: async (url) => {
+      const host = new URL(url).hostname;
+      if (host === "usher.ttvnw.net") return { ok: true, text: async () => '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nhttps://stream.example/live.m3u8\n' };
+      return { ok: true, json: async () => host === "kick.com"
+        ? { livestream: { session_title: "Live match" }, playback_url: "https://stream.example/live.m3u8?token=original" }
+        : host === "gql.twitch.tv"
+          ? { data: { streamPlaybackAccessToken: { value: JSON.stringify({ authorization: { forbidden: false } }), signature: "test-signature" } } }
+          : { data: { room_id: 22625025 } } };
+    },
     ...overrides
   });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/twitch-source.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/dashboard.js"), "utf8"), context);
   return context;
 }
@@ -71,7 +78,7 @@ for (const input of [
   test(`Kick channel resolves to an IVS stream: ${input}`, async () => {
     const result = await dashboard.resolveEmbed(input);
     assert.equal(result.src, "https://stream.example/live.m3u8?token=original");
-    assert.equal(result.kickPlayer, true);
+    assert.equal(result.livePlayer, true);
     assert.equal(result.muted, true);
     assert.equal(result.autoplay, true);
     assert.equal(result.title, "Live match");
@@ -173,31 +180,31 @@ for (const input of [
   "www.twitch.tv/roger9527",
   "https://m.twitch.tv/ROGER9527?tt_content=channel#player"
 ]) {
-  test(`Twitch live channel uses the player and actual dashboard parent: ${input}`, async () => {
-    const context = loadDashboard({ fetch: () => assert.fail("Twitch routing must not wait for a network lookup") });
+  test(`Twitch live channel resolves a signed source for the local player: ${input}`, async () => {
+    const context = loadDashboard();
     const result = await context.resolveEmbed(input);
     const url = new URL(result.src);
     assert.equal(result.ok, true);
-    assert.equal(url.origin, "https://player.twitch.tv");
-    assert.equal(url.pathname, "/");
-    assert.equal(url.searchParams.get("channel"), "roger9527");
-    assert.equal(url.searchParams.get("parent"), "test-extension");
-    assert.equal(url.searchParams.get("autoplay"), "true");
-    assert.equal(url.searchParams.get("muted"), "true");
+    assert.equal(url.origin, "https://usher.ttvnw.net");
+    assert.equal(url.pathname, "/api/v2/channel/hls/roger9527.m3u8");
+    assert.equal(url.searchParams.get("sig"), "test-signature");
+    assert.equal(result.livePlayer, true);
+    assert.equal(result.autoplay, true);
+    assert.equal(result.muted, true);
+    assert.equal(result.title, "Twitch · roger9527");
     assert.equal(url.searchParams.has("tt_content"), false);
-    assert.equal(result.twitchRetrySrc, result.src);
-    assert.equal(result.twitchFallbackSrc, undefined);
+    assert.equal(result.fallbackSrc, undefined);
+    assert.equal(context.isLocalLiveSource(new URL(input.startsWith('www.') ? `https://${input}` : input)), true);
   });
 }
 
-test("Twitch respects explicit playback options and derives the parent without a port or scheme", async () => {
-  const context = loadDashboard({ location: { href: "https://layout.example:8443/dashboard.html" } });
+test("Twitch respects explicit playback options", async () => {
+  const context = loadDashboard();
   const result = await context.resolveEmbed("https://www.twitch.tv/some_channel?autoplay=false&muted=false");
   const url = new URL(result.src);
-  assert.equal(url.searchParams.get("channel"), "some_channel");
-  assert.equal(url.searchParams.get("parent"), "layout.example");
-  assert.equal(url.searchParams.get("autoplay"), "false");
-  assert.equal(url.searchParams.get("muted"), "false");
+  assert.equal(url.pathname, "/api/v2/channel/hls/some_channel.m3u8");
+  assert.equal(result.autoplay, false);
+  assert.equal(result.muted, false);
 });
 
 for (const input of [
@@ -210,6 +217,7 @@ for (const input of [
   "https://www.twitch.tv/videos/123456789?t=1h2m3s",
   "https://www.twitch.tv/roger9527/videos",
   "https://www.twitch.tv/roger9527/clip/SomeClip",
+  "https://www.twitch.tv/roger9527?clip=SomeClip",
   "https://www.twitch.tv/popout/roger9527/chat",
   "https://clips.twitch.tv/SomeClip",
   "https://player.twitch.tv/?channel=roger9527&parent=example.org&muted=false",
@@ -218,7 +226,9 @@ for (const input of [
   "https://twitch.tv@other.example/roger9527"
 ]) {
   test(`Twitch non-channel URLs are preserved: ${input}`, async () => {
-    assert.equal((await dashboard.resolveEmbed(input)).src, new URL(input).href);
+    const context = loadDashboard({ fetch: () => assert.fail("Non-live Twitch URLs must not query playback APIs") });
+    assert.equal((await context.resolveEmbed(input)).src, new URL(input).href);
+    assert.equal(context.isLocalLiveSource(new URL(input)), false);
   });
 }
 

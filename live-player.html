@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Live player</title>
-  <link rel="stylesheet" href="src/kick-player.css">
+  <link rel="stylesheet" href="src/live-player.css">
 </head>
 <body>
   <main id="player" tabindex="0">
     <video id="video" playsinline></video>
     <p id="message" role="status"></p>
+    <span id="platform" class="platform-badge"></span>
     <div id="controls" class="player-toolbar" role="group" aria-label="播放控制">
       <button id="play" type="button" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="m8 5 11 7-11 7Z"/></svg>
@@ -28,7 +29,7 @@
     </div>
   </main>
   <script src="src/vendor/ivs/amazon-ivs-player.min.js"></script>
-  <script src="src/kick-engine.js"></script>
-  <script src="src/kick-player.js"></script>
+  <script src="src/live-engine.js"></script>
+  <script src="src/live-player.js"></script>
 </body>
 </html>

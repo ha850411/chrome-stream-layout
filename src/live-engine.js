@@ -1,6 +1,20 @@
 "use strict";
 
-function createKickEngine(video, callbacks) {
+function describeLiveError(error = {}) {
+  const types = ["ErrorAuthorization", "ErrorNetwork", "ErrorNetworkIO", "ErrorTimeout",
+    "ErrorNotAvailable", "ErrorNotSupported", "ErrorInvalidParameter", "ErrorInvalidState",
+    "ErrorInvalidData", "ErrorNoSource", "Error"];
+  const type = types.includes(error.type) ? error.type : "Error";
+  const code = Number.isFinite(error.code) ? error.code : 0;
+  const source = ["MasterPlaylist", "Playlist", "Segment", "Decoder"].includes(error.source) ? error.source : "Player";
+  const kind = type === "ErrorAuthorization" || code === 401 || code === 403 ? "authorization" :
+    ["ErrorNetwork", "ErrorNetworkIO", "ErrorTimeout", "ErrorNotAvailable"].includes(type) ? "network" : "media";
+  return { kind, type, code, source,
+    retryable: !["ErrorNotSupported", "ErrorInvalidParameter"].includes(type),
+    retryAfterMs: code === 429 ? 30000 : 0 };
+}
+
+function createLiveEngine(video, callbacks) {
   if (!globalThis.IVSPlayer?.isPlayerSupported) throw new Error("IVS is unavailable");
   const player = IVSPlayer.create({
     wasmWorker: chrome.runtime.getURL("src/vendor/ivs/amazon-ivs-wasmworker.min.js"),
@@ -49,8 +63,8 @@ function createKickEngine(video, callbacks) {
   });
   on(IVSPlayer.PlayerState.PLAYING, () => callbacks.status("sourcePlaying"));
   on(IVSPlayer.PlayerState.BUFFERING, () => callbacks.status("sourceBuffering"));
-  on(IVSPlayer.PlayerState.ENDED, () => callbacks.error());
-  on(IVSPlayer.PlayerEventType.ERROR, () => callbacks.error());
+  on(IVSPlayer.PlayerState.ENDED, () => callbacks.error({ kind: "ended" }));
+  on(IVSPlayer.PlayerEventType.ERROR, (error) => callbacks.error(describeLiveError(error)));
   // Browser autoplay rejection is recoverable with the custom Play button.
   on(IVSPlayer.PlayerEventType.PLAYBACK_BLOCKED, () => callbacks.status("sourcePaused"));
   return {

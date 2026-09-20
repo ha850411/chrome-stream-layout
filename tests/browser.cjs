@@ -8,10 +8,19 @@ const path = require("node:path");
 const os = require("node:os");
 
 (async () => {
-  const extensionPath = path.resolve(__dirname, "..");
+  const sourcePath = path.resolve(__dirname, "..");
+  const extensionPath = await fs.mkdtemp(path.join(os.tmpdir(), "stream-layout-extension-"));
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), "stream-layout-test-"));
   let context;
   try {
+    for (const entry of ["manifest.json", "dashboard.html", "live-player.html", "src", "assets", "rules"]) {
+      await fs.cp(path.join(sourcePath, entry), path.join(extensionPath, entry), { recursive: true });
+    }
+    // MV3 frames recreated after removal do not reliably receive Playwright's
+    // init scripts. Substitute only the SDK in this disposable extension copy
+    // so every player page runs the same deterministic canvas fixture.
+    await fs.writeFile(path.join(extensionPath, "src/vendor/ivs/amazon-ivs-player.min.js"),
+      `(${require("./fixtures/ivs.cjs").toString()})();`);
     context = await chromium.launchPersistentContext(profile, {
       ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
         ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: "chromium" }),
@@ -209,5 +218,6 @@ const os = require("node:os");
   } finally {
     if (context) await context.close();
     await fs.rm(profile, { recursive: true, force: true });
+    await fs.rm(extensionPath, { recursive: true, force: true });
   }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

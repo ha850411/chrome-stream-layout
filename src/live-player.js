@@ -3,6 +3,7 @@
 const surface = document.querySelector("#player");
 const video = document.querySelector("#video");
 const toolbar = document.querySelector("#controls");
+const platform = document.querySelector("#platform");
 const message = document.querySelector("#message");
 const playButton = document.querySelector("#play");
 const muteButton = document.querySelector("#mute");
@@ -17,7 +18,9 @@ let failed = false;
 let disposed = false;
 let loading = true;
 let started = false;
-let hasLoaded = false;
+let intendedPlayback = false;
+let savedPreferences;
+let lastError;
 let playbackStatus = "sourceLoading";
 let context = {};
 let labels;
@@ -66,6 +69,7 @@ function syncControls() {
 }
 function status(value) {
   if (disposed || failed) return;
+  if (value === "sourcePaused") intendedPlayback = false;
   playbackStatus = value;
   if (value === "sourcePlaying") started = true;
   if (value === "sourcePaused") showControls();
@@ -74,7 +78,9 @@ function status(value) {
   syncControls();
 }
 function showError(text) {
+  if (engine) savedPreferences = { muted: video.muted, volume: video.volume };
   failed = true;
+  playbackStatus = "sourceMediaError";
   loading = false;
   engine?.destroy();
   engine = null;
@@ -89,7 +95,7 @@ function goLive() {
 function togglePlay() {
   if (!engine || failed || loading) return;
   if (video.paused) goLive();
-  else { engine.player.pause(); status("sourcePaused"); showControls(); }
+  else { intendedPlayback = false; engine.player.pause(); status("sourcePaused"); showControls(); }
 }
 function toggleMute() {
   if (!engine || failed) return;
@@ -122,7 +128,7 @@ on(quality, "change", () => {
 on(fullscreenButton, "click", toggleFullscreen);
 on(document, "fullscreenchange", syncControls);
 on(video, "volumechange", syncControls);
-on(video, "pause", () => { if (started && !loading) status("sourcePaused"); });
+on(video, "pause", () => { if (started && !loading && !intendedPlayback) status("sourcePaused"); });
 on(surface, "keydown", (event) => {
   if (event.target.closest("button, input, select") || event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.code === "Space" || event.key.toLowerCase() === "k") { event.preventDefault(); togglePlay(); }
@@ -133,17 +139,26 @@ on(surface, "keydown", (event) => {
 const resize = new ResizeObserver(() => engine?.resize(surface.clientWidth, surface.clientHeight));
 resize.observe(surface);
 
-window.kickPlayer = {
+window.livePlayer = {
   get failed() { return failed; },
-  getPreferences() { return hasLoaded ? { muted: video.muted, volume: video.volume } : undefined; },
-  setPreferences(value) { video.muted = value.muted; video.volume = value.volume; hasLoaded = true; },
+  get lastError() { return lastError; },
+  getPreferences() { return engine ? { muted: video.muted, volume: video.volume } : savedPreferences; },
+  setPreferences(value) { savedPreferences = { muted: value.muted, volume: value.volume }; video.muted = value.muted; video.volume = value.volume; },
+  getHealth() {
+    const frames = video.getVideoPlaybackQuality?.().totalVideoFrames;
+    return { active: intendedPlayback, time: video.currentTime, frames: frames > 0 ? frames : null,
+      buffering: playbackStatus !== "sourcePlaying" };
+  },
+  showNotice(text) { message.textContent = text; showControls(); },
   bind(value) { callbacks = value; },
   setContext(value) {
     context = value;
     labels = translations[value.language] || translations.en;
     document.documentElement.lang = value.language === "zh-TW" ? "zh-Hant" : "en";
-    label(surface, value.pane);
-    label(toolbar, labels.controls);
+    surface.setAttribute("aria-label", value.pane);
+    toolbar.setAttribute("aria-label", labels.controls);
+    platform.textContent = { twitch: "Twitch", kick: "Kick" }[value.platform] || "";
+    platform.dataset.platform = value.platform || "";
     label(liveButton, value.liveTitle);
     label(quality, value.quality);
     label(volume, labels.volume);
@@ -161,12 +176,18 @@ window.kickPlayer = {
     loading = false;
     failed = false;
     started = false;
+    intendedPlayback = config.autoplay !== false;
+    lastError = undefined;
     quality.disabled = true;
     status("sourceLoading");
     try {
-      engine ||= createKickEngine(video, {
+      engine ||= createLiveEngine(video, {
         status,
-        error: () => { showError(context.error); callbacks.status?.("sourceMediaError"); },
+        error: (error) => {
+          lastError = error;
+          showError(context.error);
+          callbacks.failure?.(error);
+        },
         qualities: (options, selected) => {
           quality.replaceChildren(new Option(context.auto, "auto"), ...options.map((q) => new Option(q.label, q.value)));
           quality.value = selected;
@@ -175,9 +196,12 @@ window.kickPlayer = {
       });
       engine.resize(surface.clientWidth, surface.clientHeight);
       engine.load(config);
-      hasLoaded = true;
       syncControls();
-    } catch { showError(context.error); callbacks.status?.("sourceMediaError"); }
+    } catch {
+      lastError = { kind: "setup", retryable: false };
+      showError(context.error);
+      callbacks.failure?.(lastError);
+    }
   },
   destroy() {
     if (disposed) return;
@@ -194,4 +218,4 @@ window.kickPlayer = {
     video.load();
   }
 };
-on(window, "pagehide", () => window.kickPlayer.destroy());
+on(window, "pagehide", () => window.livePlayer.destroy());

@@ -1,6 +1,6 @@
 # Amazon IVS Player 1.56.1
 
-Local SDK assets, loaded only by `kick-player.html`:
+Local SDK assets, loaded only by `live-player.html`:
 
 - `ivs/amazon-ivs-player.min.js`: https://player.live-video.net/1.56.1/amazon-ivs-player.min.js
 - `ivs/amazon-ivs-wasmworker.min.js` and `.wasm`: `amazon-ivs-player@1.56.1/dist/assets/` from npm.
@@ -9,4 +9,4 @@ Local SDK assets, loaded only by `kick-player.html`:
 
 Keep the main SDK, worker and WASM versions identical. These files are unmodified; no remote scripts execute. The extension CSP permits local WebAssembly (`wasm-unsafe-eval`) and same-origin workers. Do not add `unsafe-eval` or blob worker permissions.
 
-Each Kick pane owns a separate extension page. LIVE loads the latest source through the same SDK instance; source changes/removal dispose the page as well as the player, releasing its worker. The former HLS.js assets are no longer used.
+Each Kick or Twitch pane owns a separate extension page. LIVE loads the latest source through the same SDK instance; source changes/removal dispose the page as well as the player, releasing its worker. The former HLS.js assets are no longer used.

@@ -20,13 +20,13 @@ function setup(supported = true) {
     PlayerState: { READY: "ready", PLAYING: "playing", BUFFERING: "buffering", ENDED: "ended" },
     PlayerEventType: { ERROR: "error", PLAYBACK_BLOCKED: "blocked" } };
   const context = vm.createContext({ IVSPlayer: sdk, chrome: { runtime: { getURL: (s) => `chrome-extension://test/${s}` } } });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/kick-engine.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/live-engine.js"), "utf8"), context);
   const notifications = [];
-  const create = () => context.createKickEngine({}, {
+  const create = () => context.createLiveEngine({}, {
     qualities: (options, selected) => notifications.push({ options, selected }),
-    status: (status) => notifications.push(status), error: () => notifications.push("error")
+    status: (status) => notifications.push(status), error: (error) => notifications.push(error)
   });
-  return { create, events, calls, notifications };
+  return { create, events, calls, notifications, context };
 }
 
 test("IVS reuses one instance across fresh signed URLs and preserves volume/mute changes", () => {
@@ -84,7 +84,20 @@ test("Disposal is idempotent and detached SDK events cannot update a removed pan
 test("Blocked autoplay remains playable; terminal errors do not create retry loops", () => {
   const r = setup(); r.create();
   r.events.get("blocked")(); r.events.get("error")();
-  assert.deepEqual(r.notifications, ["sourcePaused", "error"]);
+  assert.equal(r.notifications[0], "sourcePaused");
+  assert.equal(r.notifications[1].kind, "media");
   assert.equal(r.calls.some(([name]) => name === "load"), false);
   assert.throws(() => setup(false).create(), /unavailable/);
+});
+
+test("SDK errors preserve actionable categories without exposing tokens or signed URLs", () => {
+  const r = setup(); r.create();
+  r.events.get("error")({ type: "ErrorAuthorization", code: 403, source: "MasterPlaylist", message: "https://example.com/?token=secret" });
+  assert.deepEqual(JSON.parse(JSON.stringify(r.notifications[0])), {
+    kind: "authorization", type: "ErrorAuthorization", code: 403, source: "MasterPlaylist", retryable: true, retryAfterMs: 0
+  });
+  assert.equal(JSON.stringify(r.notifications).includes("secret"), false);
+  assert.equal(r.context.describeLiveError({ type: "ErrorNotSupported" }).retryable, false);
+  assert.equal(r.context.describeLiveError({ type: "ErrorNetwork", code: 429 }).retryAfterMs, 30000);
+  r.events.get("ended")(); assert.equal(r.notifications.at(-1).kind, "ended");
 });

@@ -2,7 +2,6 @@
 const assert = require("node:assert/strict");
 
 module.exports = async function checkKickSoop(page) {
-  await page.context().addInitScript(require("./fixtures/ivs.cjs"));
   let revision = 0;
   let holdNext = null;
   const payload = (number) => ({ livestream: { session_title: `Kick match ${number}` },
@@ -20,14 +19,23 @@ module.exports = async function checkKickSoop(page) {
     window.originalKickFrame = document.querySelector('[data-tile="0"] iframe');
     window.originalSoop = document.querySelector('[data-tile="1"] iframe');
   });
-  const kick = () => page.frameLocator('[data-tile="0"] iframe[data-kick-player]');
+  const kick = () => page.frameLocator('[data-tile="0"] iframe[data-live-player]');
   const body = () => kick().locator('body');
   const live = () => kick().locator('#live');
   const reveal = () => kick().locator('#video').hover({ position: { x: 20, y: 20 } });
   const waitStatus = (expected, index = 0) => page.waitForFunction(({ expected, index }) => document.querySelector(`[data-tile="${index}"]`).dataset.status === expected, { expected, index });
   const waitToolbar = async (visible) => {
     const frame = await (await page.locator('[data-tile="0"] iframe').elementHandle()).contentFrame();
-    await frame.waitForFunction(visible => getComputedStyle(document.querySelector('#controls')).opacity === (visible ? '1' : '0'), visible);
+    try {
+      await frame.waitForFunction(visible => getComputedStyle(document.querySelector('#controls')).opacity === (visible ? '1' : '0'), visible);
+    } catch (error) {
+      console.error('Toolbar state', await frame.evaluate(() => ({
+        classes: surface.className, opacity: getComputedStyle(toolbar).opacity,
+        hover: toolbar.matches(':hover'), focus: document.activeElement?.outerHTML,
+        idleTimer, idleDeadline, now: performance.now(), paused: video.paused
+      })));
+      throw error;
+    }
   };
   const waitSource = (number) => body().evaluate(async (_body, number) => {
     for (let i = 0; i < 100 && !ivsFixture.urls.at(-1)?.includes(`kick-${number}.m3u8`); i++) await new Promise(r => setTimeout(r, 20));
@@ -39,7 +47,9 @@ module.exports = async function checkKickSoop(page) {
   assert.equal(await page.locator('[data-slot-title="0"]').textContent(), "Kick match 1");
   assert.deepEqual(await kick().locator('#video').evaluate(v => [v.controls, v.muted]), [false, true]);
   assert.equal(await page.evaluate(() => typeof IVSPlayer), "undefined");
-  await page.mouse.move(1400, 950); await waitToolbar(false);
+  // Establish a pointer transition in the new frame before checking leave;
+  // the previous platform checks may leave the pointer at the same coordinate.
+  await reveal(); await page.mouse.move(1400, 950); await waitToolbar(false);
   await reveal(); await waitToolbar(true); await waitToolbar(false);
   await live().focus(); await waitToolbar(true);
   await body().evaluate(() => document.activeElement.blur()); await waitToolbar(false);
@@ -109,10 +119,13 @@ module.exports = async function checkKickSoop(page) {
   });
   assert.equal(await page.evaluate(() => keptKick.isConnected), true);
   assert.equal(await kick().locator('#quality').getAttribute('aria-label'), 'Stream quality');
+  assert.equal(await kick().locator('#platform').textContent(), 'Kick');
+  assert.equal(await page.locator('[data-tile="0"] iframe').getAttribute('title'), null);
+  assert.equal(await kick().locator('#player').getAttribute('title'), null);
   const widths = [180, 320, 720];
   for (const width of widths) {
     await page.evaluate(width => { document.querySelector('[data-tile="0"]').style.width = `${width}px`; }, width);
-    assert.equal(await body().evaluate(() => [...document.querySelectorAll('button, input, select')].every(el => {
+    assert.equal(await body().evaluate(() => [...document.querySelectorAll('button, input, select, #platform')].every(el => {
       const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
     })), true, `controls must fit at ${width}px`);
   }
@@ -136,7 +149,7 @@ module.exports = async function checkKickSoop(page) {
   assert.equal(await page.evaluate(() => beforeFailure.isConnected), false);
   assert.equal(await body().evaluate(() => ivsFixture.instances.length), 1);
   await page.evaluate(async () => { state.slots[0] = { url: '' }; await renderStage(); });
-  assert.equal(await page.locator('iframe[data-kick-player]').count(), 0);
+  assert.equal(await page.locator('iframe[data-live-player]').count(), 0);
   await page.unroute(apiPattern);
   console.log("PASS: custom controls fit narrow panes, labels update, LIVE overrides no-autoplay, and clearing removes the player page");
 };

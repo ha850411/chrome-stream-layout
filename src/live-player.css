@@ -5,8 +5,15 @@ html, body, #player { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 #video { width: 100%; height: 100%; object-fit: contain; display: block; }
 #message { position: absolute; inset: 0; margin: 0; display: grid; place-content: center; padding: 20px 20px 120px; text-align: center; pointer-events: none; background: #0009; }
 #message:empty { display: none; }
-.player-toolbar { position: absolute; bottom: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 24px 10px 10px; background: linear-gradient(transparent, #080e16ed); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
-.player-controls-visible .player-toolbar, .player-toolbar:has(:focus-visible) { opacity: 1; pointer-events: auto; }
+.player-toolbar { position: absolute; bottom: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 24px 10px 10px; background: linear-gradient(transparent, #080e16ed); pointer-events: none; }
+.player-toolbar, .platform-badge { opacity: 0; transition: opacity 160ms ease; }
+.player-controls-visible :is(.player-toolbar, .platform-badge), #player:has(.player-toolbar :focus-visible) :is(.player-toolbar, .platform-badge) { opacity: 1; }
+.player-controls-visible .player-toolbar, .player-toolbar:has(:focus-visible) { pointer-events: auto; }
+.platform-badge { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 7px; border: 1px solid #ffffff30; border-radius: 5px; font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; user-select: none; pointer-events: none; }
+.platform-badge:empty { display: none; }
+.platform-badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.platform-badge[data-platform="twitch"] { color: #c6a5ff; background: #251339dd; border-color: #9146ff66; }
+.platform-badge[data-platform="kick"] { color: #9bfd64; background: #13260edd; border-color: #53fc1866; }
 #player:not(.player-controls-visible):not(:focus-within) { cursor: none; }
 button, select { height: 34px; border: 1px solid #ffffff30; border-radius: 6px; background: #111b29d9; color: inherit; font: inherit; cursor: pointer; }
 button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 6px; min-width: 34px; }
@@ -21,4 +28,4 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #a8b2c0; }
 .is-live .live-dot { background: #fb6378; box-shadow: 0 0 7px #fb63784d; }
 @media (max-width: 300px) { .player-toolbar { gap: 4px; padding-inline: 6px; } .live-button { margin-left: 0; } }
-@media (prefers-reduced-motion: reduce) { .player-toolbar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .player-toolbar, .platform-badge { transition: none; } }

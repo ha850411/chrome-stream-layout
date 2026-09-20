@@ -1,7 +1,7 @@
 "use strict";
 // Browser fixture exercises the real control UI and lifecycle without a live CDN.
 module.exports = function installIVSFixture() {
-  if (!location.pathname.endsWith('/kick-player.html')) return;
+  if (!location.pathname.endsWith('/live-player.html')) return;
   window.ivsFixture = { instances: [], urls: [] };
   const sdk = {
     isPlayerSupported: true,
@@ -11,11 +11,12 @@ module.exports = function installIVSFixture() {
       const handlers = new Map();
       const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
       let video, stream, timer, auto = true, paused = true, current;
-      const emit = (name) => handlers.get(name)?.();
+      const emit = (name, value) => handlers.get(name)?.(value);
       const paint = () => { canvas.getContext('2d').fillStyle = '#183445'; canvas.getContext('2d').fillRect(0, 0, canvas.width, canvas.height); };
       const player = {
         destroyed: false,
-        fail() { emit('Error'); },
+        fail(error) { emit('Error', error); },
+        stall() { clearInterval(timer); video.pause(); emit('Buffering'); },
         addEventListener: (name, fn) => handlers.set(name, fn),
         removeEventListener: (name) => handlers.delete(name),
         attachHTMLVideoElement(v) { video = v; },
