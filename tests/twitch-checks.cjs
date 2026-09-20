@@ -76,14 +76,26 @@ module.exports = async function checkTwitch(page) {
         else await route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Twitch</title><body></body>" });
       });
       await page.evaluate(() => retryTiles([0]));
-      await page.waitForFunction(() => document.querySelector('[data-tile="0"] iframe').src === "https://www.twitch.tv/roger9527",
-        {}, { timeout: 4000 });
-      await waitForStatus("sourcePageLoaded");
-      assert.equal(playerRequests, 1);
-      assert.equal(await page.locator('iframe[data-tile-frame="0"]').getAttribute("data-twitch-fallback-src"), null);
+      await waitForStatus("sourceLoadUnconfirmed");
+      assert.equal(playerRequests, 2);
+      assert.equal(await page.locator('iframe[data-tile-frame="0"]').getAttribute("src"), src.href);
+      assert.equal(await page.locator('iframe[data-tile-frame="0"]').getAttribute("data-twitch-retry-src"), null);
       await page.unroute(playerPattern);
     }
-    console.log("PASS: blocked and blank Twitch embeds recover through the original room once");
+    await page.evaluate(() => retryTiles([0]));
+    await waitForStatus("sourcePageLoaded");
+    const reportMediaError = () => page.evaluate(() => {
+      const iframe = document.querySelector('[data-tile="0"] iframe');
+      updatePlaybackFromFrame({ source: iframe.contentWindow, origin: "https://player.twitch.tv",
+        data: { status: "sourceMediaError" } });
+    });
+    await reportMediaError();
+    await waitForStatus("sourcePageLoaded");
+    await reportMediaError();
+    await waitForStatus("sourceMediaError");
+    assert.equal(await page.locator('iframe[data-tile-frame="0"]').getAttribute("src"), src.href);
+    assert.equal(await page.evaluate(() => frameLoadTimers.has(document.querySelector('[data-tile="0"] iframe'))), false);
+    console.log("PASS: blocked, blank and failing Twitch embeds retry once without loading a full channel page");
   } finally {
     await page.unroute(playerPattern);
     await page.evaluate(() => { window.setTimeout = twitchTestSetTimeout; });

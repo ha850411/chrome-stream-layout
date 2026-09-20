@@ -1,0 +1,24 @@
+:root { color-scheme: dark; font: 13px system-ui, sans-serif; color: #edf3f7; background: #000; }
+* { box-sizing: border-box; }
+html, body, #player { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#player { position: relative; outline: none; }
+#video { width: 100%; height: 100%; object-fit: contain; display: block; }
+#message { position: absolute; inset: 0; margin: 0; display: grid; place-content: center; padding: 20px 20px 120px; text-align: center; pointer-events: none; background: #0009; }
+#message:empty { display: none; }
+.player-toolbar { position: absolute; bottom: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 24px 10px 10px; background: linear-gradient(transparent, #080e16ed); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.player-controls-visible .player-toolbar, .player-toolbar:has(:focus-visible) { opacity: 1; pointer-events: auto; }
+#player:not(.player-controls-visible):not(:focus-within) { cursor: none; }
+button, select { height: 34px; border: 1px solid #ffffff30; border-radius: 6px; background: #111b29d9; color: inherit; font: inherit; cursor: pointer; }
+button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 6px; min-width: 34px; }
+button:hover, select:hover { background: #2c3b4f; }
+button:disabled, select:disabled, input:disabled { opacity: .5; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #80e0cf; outline-offset: 2px; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#quality { max-width: 100%; min-width: 76px; padding: 0 4px; }
+.volume-control { display: flex; align-items: center; gap: 4px; }
+#volume { width: 66px; margin: 0; accent-color: #80e0cf; cursor: pointer; }
+.live-button { gap: 6px; padding: 6px 9px; font-size: 12px; font-weight: 650; letter-spacing: .04em; margin-left: auto; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: #a8b2c0; }
+.is-live .live-dot { background: #fb6378; box-shadow: 0 0 7px #fb63784d; }
+@media (max-width: 300px) { .player-toolbar { gap: 4px; padding-inline: 6px; } .live-button { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .player-toolbar { transition: none; } }

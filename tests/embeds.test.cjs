@@ -26,7 +26,9 @@ function loadDashboard(overrides = {}) {
     // Hold UI initialization at its first storage read; exercise the real
     // routing functions without constructing a dashboard DOM or using network.
     chrome: { storage: { local: { get: () => new Promise(() => {}) } } },
-    fetch: async () => ({ ok: true, json: async () => ({ data: { room_id: 22625025 } }) }),
+    fetch: async (url) => ({ ok: true, json: async () => new URL(url).hostname === "kick.com"
+      ? { livestream: { session_title: "Live match" }, playback_url: "https://stream.example/live.m3u8?token=original" }
+      : { data: { room_id: 22625025 } } }),
     ...overrides
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/dashboard.js"), "utf8"), context);
@@ -66,17 +68,90 @@ for (const input of [
   "https://kick.com/starladder", "http://www.kick.com/starladder/",
   "kick.com/STARLADDER?ref=share#live"
 ]) {
-  test(`Kick channel uses its official player: ${input}`, async () => {
-    const context = loadDashboard({ fetch: () => assert.fail("Kick embeds must not require a lookup") });
-    const result = await context.resolveEmbed(input);
-    assert.equal(result.src, "https://player.kick.com/starladder?autoplay=true&muted=true");
-    assert.equal(context.getSourceLabel(input), "Kick");
+  test(`Kick channel resolves to an IVS stream: ${input}`, async () => {
+    const result = await dashboard.resolveEmbed(input);
+    assert.equal(result.src, "https://stream.example/live.m3u8?token=original");
+    assert.equal(result.kickPlayer, true);
+    assert.equal(result.muted, true);
+    assert.equal(result.autoplay, true);
+    assert.equal(result.title, "Live match");
+    assert.equal(dashboard.getSourceLabel(input), "Kick");
   });
 }
 
 test("Kick preserves explicit playback preferences and supports channel punctuation", async () => {
   const result = await dashboard.resolveEmbed("https://kick.com/some_channel-1?autoplay=false&muted=false");
-  assert.equal(result.src, "https://player.kick.com/some_channel-1?autoplay=false&muted=false");
+  assert.equal(dashboard.getKickLiveChannel(new URL("https://kick.com/some_channel-1")), "some_channel-1");
+  assert.equal(result.autoplay, false);
+  assert.equal(result.muted, false);
+});
+
+test("Kick refresh fetches a new URL each time without changing signed stream parameters", async () => {
+  let calls = 0;
+  const context = loadDashboard({ fetch: async (input, options) => {
+    const url = new URL(input);
+    assert.equal(url.origin + url.pathname, "https://kick.com/api/v2/channels/starladder");
+    assert.ok(url.searchParams.get("_"));
+    assert.equal(options.cache, "no-store");
+    assert.equal(options.credentials, "omit");
+    const sequence = ++calls;
+    return { ok: true, json: async () => ({ livestream: { session_title: `Match ${sequence}` },
+      playback_url: `https://stream.example/live.m3u8?token=${sequence}&signature=a%2Fb%3D` }) };
+  } });
+  const first = await context.resolveEmbed("https://kick.com/starladder");
+  const second = await context.resolveEmbed("https://kick.com/starladder");
+  assert.equal(first.src, "https://stream.example/live.m3u8?token=1&signature=a%2Fb%3D");
+  assert.equal(second.src, "https://stream.example/live.m3u8?token=2&signature=a%2Fb%3D");
+  assert.equal(second.title, "Match 2");
+});
+
+test("Kick distinguishes offline channels from lookup failures", async () => {
+  for (const livestream of [null, { is_live: false }]) {
+    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => ({ livestream }) }) });
+    await assert.rejects(context.resolveEmbed("https://kick.com/starladder"), (e) => e.code === "sourceOffline");
+  }
+  const context = loadDashboard({ fetch: async () => ({ ok: false }) });
+  await assert.rejects(context.resolveEmbed("https://kick.com/starladder"), /lookup failed/);
+});
+
+test("Kick rejects malformed API responses and unsafe playback URLs", async () => {
+  for (const payload of [null, {}, { livestream: {} }, ...[
+    "javascript:alert(1)", "http://stream.example/live.m3u8", "https://stream.example/login.html",
+    "https://user:password@stream.example/live.m3u8"
+  ].map((playback_url) => ({ livestream: {}, playback_url }))]) {
+    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => payload }) });
+    await assert.rejects(context.resolveEmbed("https://kick.com/starladder"));
+  }
+});
+
+test("Kick lookup times out and a subsequent refresh can recover", async () => {
+  let calls = 0;
+  const context = loadDashboard({
+    window: { setTimeout: (fn) => setTimeout(fn, 5), clearTimeout },
+    fetch: async (_url, { signal }) => {
+      if (++calls > 1) return { ok: true, json: async () => ({ livestream: {}, playback_url: "https://stream.example/fresh.m3u8" }) };
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+    }
+  });
+  await assert.rejects(context.resolveEmbed("https://kick.com/starladder"), (e) => e.code === "sourceTimeout");
+  assert.equal((await context.resolveEmbed("https://kick.com/starladder")).src, "https://stream.example/fresh.m3u8");
+});
+
+test("Replacing a Kick lookup aborts the pending network request", async () => {
+  let started;
+  const pending = new Promise((resolve) => { started = resolve; });
+  let aborted = false;
+  const context = loadDashboard({ fetch: async (_url, { signal }) => {
+    started();
+    return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+      aborted = true; reject(new Error("aborted"));
+    }));
+  } });
+  const controller = new AbortController();
+  const request = context.resolveEmbed("https://kick.com/starladder", controller.signal);
+  await pending; controller.abort();
+  await assert.rejects(request);
+  assert.equal(aborted, true);
 });
 
 for (const input of [
@@ -110,6 +185,8 @@ for (const input of [
     assert.equal(url.searchParams.get("autoplay"), "true");
     assert.equal(url.searchParams.get("muted"), "true");
     assert.equal(url.searchParams.has("tt_content"), false);
+    assert.equal(result.twitchRetrySrc, result.src);
+    assert.equal(result.twitchFallbackSrc, undefined);
   });
 }
 

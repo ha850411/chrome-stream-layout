@@ -9,6 +9,7 @@ const LEGACY_STORAGE_KEY = "live-mosaic-state-v1";
 const SLOT_COUNT = 4;
 const SOURCE_RESOLVE_TIMEOUT_MS = 8000;
 const FRAME_LOAD_TIMEOUT_MS = 20000;
+const TILE_PLAYER_SELECTOR = "iframe[data-tile-frame]";
 const BILIBILI_ROOM_INIT_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/room_init";
 const BILIBILI_ROOM_INFO_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/get_info";
 const YESLIVE_THEATER_VIEWPORT = {
@@ -59,6 +60,10 @@ const TRANSLATIONS = {
     newSource: "Add a stream source",
     reloadPane: "Reload pane {number}",
     reload: "Reload",
+    refreshStream: "LIVE",
+    refreshStreamPane: "Return pane {number} to the live broadcast",
+    streamQuality: "Stream quality",
+    automaticQuality: "Auto",
     applyFirst: "Apply source changes first",
     layout2: "Side by side",
     layout3: "Main + two",
@@ -90,6 +95,7 @@ const TRANSLATIONS = {
     sourceLoadUnconfirmed: "Loading is taking longer than expected · try again",
     sourceFailed: "Could not load this source. Try again.",
     sourceTimeout: "Source lookup timed out. Try again.",
+    sourceOffline: "This channel is offline. Press LIVE when it starts.",
     rulesFailed: "Playback setup failed. Use Retry or Reload all to try again.",
     video: "Video",
     dragWidth: "Drag to resize width",
@@ -126,6 +132,10 @@ const TRANSLATIONS = {
     newSource: "新增直播來源",
     reloadPane: "重新載入窗格 {number}",
     reload: "重新載入",
+    refreshStream: "LIVE",
+    refreshStreamPane: "將窗格 {number} 接回最新直播",
+    streamQuality: "直播畫質",
+    automaticQuality: "自動",
     applyFirst: "請先套用來源變更",
     layout2: "雙畫面",
     layout3: "主副畫面",
@@ -157,6 +167,7 @@ const TRANSLATIONS = {
     sourceLoadUnconfirmed: "載入時間較長，可按重試重新載入",
     sourceFailed: "無法載入此來源，請重試。",
     sourceTimeout: "來源解析逾時，請重試。",
+    sourceOffline: "此頻道尚未開播，開播後可按 LIVE。",
     rulesFailed: "播放設定未成功，請按「重試」或「全部重新載入」。",
     video: "影片",
     dragWidth: "拖曳以調整寬度",
@@ -660,7 +671,7 @@ function updateSlotPlaybackStatus(index) {
   const key = pending ? "sourcePending" : inactive ? "idle" : !slot.url.trim() ? "noSource" :
     tile?.dataset.sourceUrl !== slot.url ? "sourcePending" : tile.dataset.status || "sourceLoading";
   status.textContent = t(pending && !slot.url ? "sourceRemoving" : key);
-  const failed = ["sourceFailed", "sourceTimeout", "sourceMediaError", "sourceLoadUnconfirmed", "httpOnly", "enterCompleteUrl"].includes(key);
+  const failed = ["sourceFailed", "sourceTimeout", "sourceOffline", "sourceMediaError", "sourceLoadUnconfirmed", "httpOnly", "enterCompleteUrl"].includes(key);
   const loading = ["sourceResolving", "sourceLoading", "sourceBuffering"].includes(key);
   const tone = pending ? "pending" : failed ? "error" : loading ? "loading" : key === "sourcePlaying" ? "playing" : "neutral";
   const container = slotControls.querySelector(`[data-status-container="${index}"]`);
@@ -668,10 +679,12 @@ function updateSlotPlaybackStatus(index) {
   const icon = slotControls.querySelector(`[data-status-icon="${index}"]`);
   icon.textContent = failed ? "!" : pending ? "○" : loading ? "" : key === "sourcePlaying" ? "▶" : key === "sourcePaused" ? "Ⅱ" : "·";
   const retry = slotControls.querySelector(`[data-retry-slot="${index}"]`);
+  const kickChannel = getKickLiveChannel(parseUrl(slot.url));
+  retry.hidden = Boolean(kickChannel);
   retry.disabled = inactive || pending || !slot.url.trim();
-  retry.textContent = t(failed ? "retry" : "reload");
+  retry.textContent = t(kickChannel ? "refreshStream" : failed ? "retry" : "reload");
   retry.classList.toggle("is-retry", failed);
-  retry.title = pending ? t("applyFirst") : t(failed ? "retryPane" : "reloadPane", { number: index + 1 });
+  retry.title = pending ? t("applyFirst") : t(kickChannel ? "refreshStreamPane" : failed ? "retryPane" : "reloadPane", { number: index + 1 });
   retry.setAttribute("aria-label", retry.title);
   slotControls.querySelector(`[data-pending-slot="${index}"]`).hidden = !pending;
   slotControls.querySelector(`[data-slot-target="${index}"]`).classList.toggle("has-draft", pending);
@@ -844,6 +857,7 @@ function retargetStageTile(tile, index) {
     iframe.name = `chrome-stream-layout-pane-${index}`;
     iframe.title = t("pane", { number: index + 1 });
   }
+  if (iframe?.dataset.kickPlayer) updateKickContext(iframe);
 }
 
 async function renderStage() {
@@ -877,7 +891,7 @@ async function renderStage() {
       setTileStatus(tile, "noSource");
       return;
     }
-    if (reuse && tile.querySelector("iframe[data-tile-frame]")) {
+    if (reuse && tile.querySelector(TILE_PLAYER_SELECTOR)) {
       updateSlotPlaybackStatus(index);
       return;
     }
@@ -886,7 +900,7 @@ async function renderStage() {
       return tileLoads.get(tile).promise;
     }
     if (reuse && tile.querySelector(".tile-error")) {
-      tile.replaceChildren(createErrorState(t(tile.dataset.status)));
+      showTileError(tile, slot.url, t(tile.dataset.status));
       updateSlotPlaybackStatus(index);
       return;
     }
@@ -903,38 +917,44 @@ async function renderStage() {
 }
 
 function disposeTileLoad(tile) {
+  const job = tileLoads.get(tile);
   tileLoads.delete(tile);
-  tile.querySelectorAll("iframe[data-tile-frame]").forEach(clearFrameLoadTimer);
+  job?.controller.abort();
+  tile.querySelectorAll(TILE_PLAYER_SELECTOR).forEach(clearFrameLoadTimer);
+  disposeKickFrames(tile);
   const shell = tile.querySelector("[data-fixed-viewport]");
   if (shell) fixedViewportObserver.unobserve(shell);
 }
 
-function loadTileSource(tile, sourceUrl) {
+function loadTileSource(tile, sourceUrl, options = {}) {
+  if (getKickLiveChannel(parseUrl(sourceUrl))) return loadKickTile(tile, sourceUrl, options);
   tile.replaceChildren();
   setTileStatus(tile, "sourceResolving");
-  const job = {};
+  const job = { controller: new AbortController() };
   tileLoads.set(tile, job);
   job.promise = (async () => {
     try {
-      const embed = await resolveEmbed(sourceUrl);
+      const embed = await resolveEmbed(sourceUrl, job.controller.signal);
       if (tileLoads.get(tile) !== job || !tile.isConnected) return;
       if (!embed.ok) {
-        tile.replaceChildren(createErrorState(embed.message));
+        showTileError(tile, sourceUrl, embed.message);
         setTileStatus(tile, embed.errorKey || "sourceFailed");
         return;
       }
       const index = Number(tile.dataset.tile);
       tile.replaceChildren(createTileFrame(index, embed, sourceUrl));
       setTileStatus(tile, "sourceLoading");
-      const iframe = tile.querySelector("iframe[data-tile-frame]");
-      startFrameLoadTimer(iframe);
-      if (embed.bilibiliRoomId) void refreshBilibiliFrameTitle(iframe);
+      const player = tile.querySelector(TILE_PLAYER_SELECTOR);
+      startFrameLoadTimer(player);
+      if (embed.title) setFrameSourceTitle(player, embed.title);
+      if (embed.bilibiliRoomId) void refreshBilibiliFrameTitle(player);
       const shell = tile.querySelector("[data-fixed-viewport]");
       if (shell) fixedViewportObserver.observe(shell);
     } catch (error) {
       if (tileLoads.get(tile) !== job || !tile.isConnected) return;
-      const key = error?.code === "sourceTimeout" ? "sourceTimeout" : "sourceFailed";
-      tile.replaceChildren(createErrorState(t(key)));
+      const key = ["sourceTimeout", "sourceOffline"].includes(error?.code) ? error.code : "sourceFailed";
+      disposeTileLoad(tile);
+      showTileError(tile, sourceUrl, t(key));
       setTileStatus(tile, key);
     } finally {
       if (tileLoads.get(tile) === job) tileLoads.delete(tile);
@@ -953,7 +973,7 @@ function startFrameLoadTimer(iframe) {
   frameLoadTimers.set(iframe, window.setTimeout(() => {
     frameLoadTimers.delete(iframe);
     if (!iframe.isConnected) return;
-    if (!fallbackFromTwitchEmbed(iframe)) {
+    if (!retryTwitchEmbed(iframe)) {
       setTileStatus(iframe.closest("[data-tile]"), "sourceLoadUnconfirmed");
     }
   }, FRAME_LOAD_TIMEOUT_MS));
@@ -989,7 +1009,7 @@ function createTileFrame(index, embed, sourceUrl) {
     if (!iframe.isConnected) return;
     // A blocked/blank iframe can still fire load. Keep Twitch's deadline until
     // its content script confirms that an actual video element is present.
-    if (iframe.dataset.twitchFallbackSrc) {
+    if (iframe.dataset.twitchPlayer) {
       if (!frameLoadTimers.has(iframe)) startFrameLoadTimer(iframe);
     } else {
       clearFrameLoadTimer(iframe);
@@ -1003,7 +1023,10 @@ function createTileFrame(index, embed, sourceUrl) {
   if (embed.fallbackSrc) {
     iframe.dataset.fallbackSrc = embed.fallbackSrc;
   }
-  if (embed.twitchFallbackSrc) iframe.dataset.twitchFallbackSrc = embed.twitchFallbackSrc;
+  if (embed.twitchRetrySrc) {
+    iframe.dataset.twitchPlayer = "true";
+    iframe.dataset.twitchRetrySrc = embed.twitchRetrySrc;
+  }
 
   if (embed.fixedViewport) {
     iframe.width = String(embed.fixedViewport.width);
@@ -1012,6 +1035,10 @@ function createTileFrame(index, embed, sourceUrl) {
 
   shell.append(iframe);
   return shell;
+}
+
+function showTileError(tile, sourceUrl, message) {
+  tile.replaceChildren(createErrorState(message));
 }
 
 function fallbackFromYouTubeEmbed(event) {
@@ -1040,22 +1067,22 @@ function updatePlaybackFromFrame(event) {
     (candidate) => candidate.contentWindow === event.source
   );
   if (!iframe) return;
-  if (event.data.status === "sourceMediaError" && fallbackFromTwitchEmbed(iframe)) return;
-  if (event.data.status !== "sourcePageLoaded" || !iframe.dataset.twitchFallbackSrc) {
+  if (event.data.status === "sourceMediaError" && retryTwitchEmbed(iframe)) return;
+  if (event.data.status !== "sourcePageLoaded" || !iframe.dataset.twitchPlayer) {
     clearFrameLoadTimer(iframe);
   }
   setTileStatus(iframe.closest("[data-tile]"), event.data.status);
 }
 
-function fallbackFromTwitchEmbed(iframe) {
-  const fallbackSrc = iframe.dataset.twitchFallbackSrc;
-  if (!fallbackSrc || !iframe.isConnected) return false;
-  // One attempt per source load. A paused but initialized player cancels the
-  // deadline; an unavailable embed can recover through the normal room page.
-  delete iframe.dataset.twitchFallbackSrc;
+function retryTwitchEmbed(iframe) {
+  const retrySrc = iframe.dataset.twitchRetrySrc;
+  if (!retrySrc || !iframe.isConnected) return false;
+  // Retry only the embedded player once. Never replace it with a full channel
+  // page; transient errors must not introduce navigation, chat or recommendations.
+  delete iframe.dataset.twitchRetrySrc;
   setTileStatus(iframe.closest("[data-tile]"), "sourceLoading");
   startFrameLoadTimer(iframe);
-  iframe.src = fallbackSrc;
+  iframe.src = retrySrc;
   return true;
 }
 
@@ -1075,7 +1102,7 @@ function updateTitleFromFrame(event) {
 
 function setFrameSourceTitle(iframe, value) {
   if (!iframe.isConnected) return;
-  const index = Number(iframe.dataset.tileFrame);
+  const index = Number(iframe.dataset.tileFrame ?? iframe.dataset.tileVideo);
   const sourceUrl = iframe.dataset.sourceUrl || "";
   if (!Number.isInteger(index) || state.slots[index]?.url !== sourceUrl) return;
 
@@ -1113,6 +1140,7 @@ function normalizePageTitle(value) {
 }
 
 function requestFrameTitle(iframe) {
+  if (iframe.dataset.kickPlayer) { updateKickContext(iframe); return; }
   iframe.contentWindow?.postMessage({
     type: "chrome-stream-layout:request-title"
   }, "*");
@@ -1144,7 +1172,8 @@ function syncStateFromForm() {
     const url = input ? input.value.trim() : getEditableSlot(index).url;
     return {
       url,
-      title: url === state.slots[index].url ? state.slots[index].title : ""
+      title: url === state.slots[index].url ? state.slots[index].title : "",
+      quality: url === state.slots[index].url ? state.slots[index].quality : "auto"
     };
   });
 
@@ -1196,7 +1225,7 @@ function reloadAllTiles() {
   void retryTiles(Array.from({ length: state.layout }, (_, index) => index));
 }
 
-async function retryTiles(indices) {
+async function retryTiles(indices, options = {}) {
   const reloadIndices = indices.filter((index) => Number.isInteger(index) && index >= 0 && index < state.layout);
   // Capture the user's retry targets before yielding; layout/URL edits may
   // happen while the worker is preparing the rules.
@@ -1213,14 +1242,16 @@ async function retryTiles(indices) {
   await Promise.all(currentIndices.map((index) => {
     const tile = stage.querySelector(`[data-tile="${index}"]`);
     if (!tile) return;
-    disposeTileLoad(tile);
+    if (!getKickLiveChannel(parseUrl(state.slots[index].url)) || tile.dataset.sourceUrl !== state.slots[index].url) {
+      disposeTileLoad(tile);
+    }
     tile.dataset.sourceUrl = state.slots[index].url;
     if (!tile.dataset.sourceUrl.trim()) {
       tile.replaceChildren(createEmptyState(index));
       setTileStatus(tile, "noSource");
       return;
     }
-    return loadTileSource(tile, tile.dataset.sourceUrl);
+    return loadTileSource(tile, tile.dataset.sourceUrl, options);
   }));
 }
 
@@ -1431,7 +1462,7 @@ function flushTileFrameViewportChange() {
   });
 }
 
-async function resolveEmbed(rawUrl) {
+async function resolveEmbed(rawUrl, signal) {
   const parsed = parseUrl(rawUrl);
   if (!parsed) {
     return { ok: false, errorKey: "enterCompleteUrl", message: t("enterCompleteUrl") };
@@ -1466,7 +1497,7 @@ async function resolveEmbed(rawUrl) {
     return {
       ok: true,
       src: twitchLivePlayer,
-      twitchFallbackSrc: parsed.href,
+      twitchRetrySrc: twitchLivePlayer,
       referrerPolicy: "strict-origin-when-cross-origin"
     };
   }
@@ -1480,12 +1511,16 @@ async function resolveEmbed(rawUrl) {
     };
   }
 
-  const kickLivePlayer = getKickLivePlayerUrl(parsed);
-  if (kickLivePlayer) {
+  const kickChannel = getKickLiveChannel(parsed);
+  if (kickChannel) {
+    const stream = await fetchKickLiveStream(kickChannel, signal);
     return {
       ok: true,
-      src: kickLivePlayer,
-      referrerPolicy: "strict-origin-when-cross-origin"
+      src: stream.url,
+      title: stream.title,
+      kickPlayer: true,
+      autoplay: parsed.searchParams.get("autoplay") !== "false",
+      muted: parsed.searchParams.get("muted") !== "false"
     };
   }
 
@@ -1784,8 +1819,8 @@ function isKickHost(hostname) {
   return hostname === "kick.com" || hostname.endsWith(".kick.com");
 }
 
-function getKickLivePlayerUrl(url) {
-  if (!["kick.com", "www.kick.com"].includes(url.hostname.toLowerCase())) return "";
+function getKickLiveChannel(url) {
+  if (!url || !["kick.com", "www.kick.com"].includes(url.hostname.toLowerCase())) return "";
   // Clips can use a channel URL with a clip query; keep those and VOD routes.
   if (url.searchParams.has("clip")) return "";
   const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)\/?$/);
@@ -1796,11 +1831,49 @@ function getKickLivePlayerUrl(url) {
     "search", "security", "settings", "signup", "subscriptions", "terms-of-service"
   ];
   if (!match || reserved.includes(match[1].toLowerCase())) return "";
-  const embedUrl = new URL(`https://player.kick.com/${match[1].toLowerCase()}`);
-  for (const name of ["autoplay", "muted"]) {
-    embedUrl.searchParams.set(name, url.searchParams.get(name) === "false" ? "false" : "true");
+  return match[1].toLowerCase();
+}
+
+async function fetchKickLiveStream(channel, signal) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
+  try {
+    const apiUrl = new URL(`https://kick.com/api/v2/channels/${encodeURIComponent(channel)}`);
+    // Also avoid an intermediary serving a previously cached channel response.
+    apiUrl.searchParams.set("_", String(Date.now()));
+    const response = await fetch(apiUrl.href, {
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Kick channel lookup failed.");
+    const payload = await response.json();
+    if (payload?.livestream === null || payload?.livestream?.is_live === false) {
+      throw Object.assign(new Error("Kick channel is offline."), { code: "sourceOffline" });
+    }
+    if (!payload?.livestream || typeof payload.playback_url !== "string") {
+      throw new Error("Invalid Kick channel response.");
+    }
+    const streamUrl = new URL(payload.playback_url);
+    if (streamUrl.protocol !== "https:" || streamUrl.username || streamUrl.password || getPathExtension(streamUrl) !== "m3u8") {
+      throw new Error("Invalid Kick stream URL.");
+    }
+    return {
+      url: streamUrl.href,
+      title: normalizePageTitle(payload.livestream.session_title) || `Kick · ${channel}`
+    };
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw Object.assign(new Error("Kick channel lookup timed out."), { code: "sourceTimeout" });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
   }
-  return embedUrl.href;
 }
 
 function isSoopHost(hostname) {
@@ -1909,7 +1982,9 @@ function normalizeState(input) {
   const sourceSlots = Array.isArray(input?.slots) ? input.slots : DEFAULT_STATE.slots;
   const slots = Array.from({ length: SLOT_COUNT }, (_, index) => ({
     url: String(sourceSlots[index]?.url || ""),
-    title: normalizePageTitle(sourceSlots[index]?.title)
+    title: normalizePageTitle(sourceSlots[index]?.title),
+    quality: /^(auto|[1-9]\d{1,4}p(?:[1-9]\d{0,2})?)$/.test(sourceSlots[index]?.quality)
+      ? sourceSlots[index].quality : "auto"
   }));
 
   return {
