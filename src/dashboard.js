@@ -33,6 +33,8 @@ const TRANSLATIONS = {
     reloadAll: "Reload all",
     layoutFullscreen: "Layout fullscreen",
     exitLayoutFullscreen: "Exit layout fullscreen",
+    maximizeLayout: "Maximize current layout",
+    layoutMaximized: "Layout maximized",
     close: "Close",
     sourcesAndLayout: "Sources and layout",
     language: "Language",
@@ -109,6 +111,8 @@ const TRANSLATIONS = {
     reloadAll: "全部重新載入",
     layoutFullscreen: "版面全螢幕",
     exitLayoutFullscreen: "離開版面全螢幕",
+    maximizeLayout: "最大化目前配置",
+    layoutMaximized: "已最大化目前配置",
     close: "關閉",
     sourcesAndLayout: "來源與版面",
     language: "介面語言",
@@ -216,6 +220,8 @@ const slotControls = document.querySelector("#slotControls");
 const saveStatus = document.querySelector("#saveStatus");
 const clearButton = document.querySelector("#clearButton");
 const fullscreenButton = document.querySelector("#fullscreenButton");
+const maximizeLayoutButton = document.querySelector("#maximizeLayoutButton");
+const maximizeLayoutLabel = document.querySelector("#maximizeLayoutLabel");
 const reloadAllButton = document.querySelector("#reloadAllButton");
 const closeControlsButton = document.querySelector("#closeControlsButton");
 const applyButton = document.querySelector("#applyButton");
@@ -354,6 +360,7 @@ function bindEvents() {
 
   reloadAllButton.addEventListener("click", reloadAllTiles);
   fullscreenButton.addEventListener("click", toggleFullscreen);
+  maximizeLayoutButton.addEventListener("click", maximizeLayout);
   document.addEventListener("fullscreenchange", syncFullscreenState);
   window.addEventListener("resize", syncViewportState, { passive: true });
   window.addEventListener("message", (event) => {
@@ -1242,6 +1249,23 @@ async function retryTiles(indices, options = {}) {
   }));
 }
 
+function maximizeLayout() {
+  document.body.classList.add("is-layout-maximized");
+  const layoutKey = `layout${state.layout}`;
+  const sizes = { ...DEFAULT_STATE.sizes[layoutKey] };
+  if (state.layout === 3) {
+    const { width, height } = stage.getBoundingClientRect();
+    // Fit two 16:9 videos to the right column's available height; the main
+    // pane uses the remaining width. Account for the 5px separator tracks.
+    const rightWidth = Math.max(0, height - 5) / 2 * 16 / 9;
+    sizes.col = roundPercent(clamp((1 - rightWidth / Math.max(1, width - 5)) * 100, 18, 82));
+  }
+  state.sizes[layoutKey] = sizes;
+  applyStageSizing();
+  closeControls();
+  void persistState(t("layoutMaximized"));
+}
+
 function toggleFullscreen() {
   if (document.fullscreenElement) {
     void document.exitFullscreen().catch(() => {});
@@ -1995,6 +2019,7 @@ function applyLanguage() {
   reloadAllButton.setAttribute("aria-label", t("reloadAll"));
   closeControlsButton.title = t("close");
   closeControlsButton.setAttribute("aria-label", t("close"));
+  maximizeLayoutLabel.textContent = t("maximizeLayout");
   document.querySelector(".layout-switch").setAttribute("aria-label", t("paneCount"));
   syncFullscreenState();
   updatePlaybackNotice();

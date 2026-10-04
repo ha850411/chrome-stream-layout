@@ -172,6 +172,7 @@ const os = require("node:os");
     console.log("PASS: failed rule installation is visible and recoverable");
 
     await require("./ui-checks.cjs")(page);
+    await require("./layout-checks.cjs")(page);
 
     const helperPage = await context.newPage();
     helperPage.on("pageerror", (error) => errors.push(error.message));
