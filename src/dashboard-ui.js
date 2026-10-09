@@ -1,6 +1,8 @@
 "use strict";
 
 // Viewing and editing affordances never apply URL drafts or rebuild players.
+const VIEW_TOOLS_IDLE_DELAY_MS = 1000;
+const VIEW_TOOLS_LEAVE_DELAY_MS = 300;
 let viewToolsTimer = 0;
 let paneHighlightTimer = 0;
 let sourceMenuResult = null;
@@ -78,15 +80,30 @@ function bindLanguageMenu() {
   });
 }
 
-function showViewTools() {
+function showViewTools(delay = VIEW_TOOLS_IDLE_DELAY_MS) {
   const tools = document.querySelector("#viewTools");
-  if (tools.hidden) return;
+  if (!tools || tools.hidden) return;
   window.clearTimeout(viewToolsTimer);
   tools.classList.add("is-visible");
   viewToolsTimer = window.setTimeout(() => {
     const keyboardFocus = tools.contains(document.activeElement) && document.activeElement.matches(":focus-visible");
     if (!tools.matches(":hover") && !keyboardFocus) tools.classList.remove("is-visible");
-  }, 2400);
+  }, delay);
+}
+
+function hideViewTools(delay = VIEW_TOOLS_LEAVE_DELAY_MS) {
+  const tools = document.querySelector("#viewTools");
+  if (!tools || tools.hidden) return;
+  window.clearTimeout(viewToolsTimer);
+  const doHide = () => {
+    const keyboardFocus = tools.contains(document.activeElement) && document.activeElement.matches(":focus-visible");
+    if (!tools.matches(":hover") && !keyboardFocus) tools.classList.remove("is-visible");
+  };
+  if (delay <= 0) {
+    doHide();
+  } else {
+    viewToolsTimer = window.setTimeout(doHide, delay);
+  }
 }
 
 function bindViewingControls() {
@@ -97,13 +114,16 @@ function bindViewingControls() {
     openControls(index);
   });
   const tools = document.querySelector("#viewTools");
-  for (const name of ["pointerenter", "pointerleave", "focusin", "focusout"]) {
-    tools.addEventListener(name, showViewTools);
+  tools.addEventListener("pointerenter", () => showViewTools());
+  tools.addEventListener("pointerleave", () => hideViewTools(VIEW_TOOLS_LEAVE_DELAY_MS));
+  tools.addEventListener("focusin", () => showViewTools());
+  tools.addEventListener("focusout", () => hideViewTools(200));
+
+  for (const name of ["pointermove", "pointerenter"]) {
+    document.addEventListener(name, () => showViewTools(), { passive: true });
+    stage.addEventListener(name, () => showViewTools(), { passive: true });
   }
-  for (const name of ["pointermove", "pointerenter", "pointerdown"]) {
-    document.addEventListener(name, showViewTools, { passive: true });
-    stage.addEventListener(name, showViewTools, { passive: true });
-  }
+  stage.addEventListener("pointerdown", () => hideViewTools(0), { passive: true });
   document.querySelector("#openControlsButton").addEventListener("click", () => openControls());
   document.querySelector("#viewFullscreenButton").addEventListener("click", toggleFullscreen);
   stage.addEventListener("click", (event) => {

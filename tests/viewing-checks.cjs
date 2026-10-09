@@ -29,7 +29,8 @@ module.exports = async function checkViewingControls(page) {
   await page.locator("#dialogFullscreenButton").click();
   await page.waitForFunction(() => !document.fullscreenElement);
   await page.keyboard.press("Escape");
-  console.log("PASS: viewing tools reveal on hover/focus, restore focus, and open settings during fullscreen");
+  await page.waitForFunction(() => !document.querySelector("#viewTools").classList.contains("is-visible"));
+  console.log("PASS: viewing tools reveal on hover/focus, restore focus, auto-hide on idle, and open settings during fullscreen");
 
   await page.locator('[data-tile="1"] [data-source-action="edit"]').click();
   await page.waitForFunction(() => document.activeElement.dataset.urlInput === "1");
