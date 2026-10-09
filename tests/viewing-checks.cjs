@@ -10,24 +10,23 @@ module.exports = async function checkViewingControls(page) {
     document.body.classList.remove("is-layout-maximized");
     applyLanguage(); renderControls(); await renderStage(); closeControls();
   });
+  // Hovering anywhere over panes immediately reveals viewing controls
   await page.mouse.move(100, 100);
-  await page.waitForFunction(() => !document.querySelector("#viewTools").classList.contains("is-visible"));
-  await page.mouse.move(1410, 5);
   await page.waitForFunction(() => document.querySelector("#viewTools").classList.contains("is-visible"));
   await page.locator("#openControlsButton").focus();
   await page.keyboard.press("Enter");
   assert.equal(await page.locator("#controlOverlay").isVisible(), true);
+  assert.equal(await page.locator("#dialogFullscreenButton").isVisible(), true);
   await page.keyboard.press("Escape");
   assert.equal(await page.evaluate(() => document.activeElement.id), "openControlsButton");
   await page.locator("#viewFullscreenButton").click();
   await page.waitForFunction(() => document.fullscreenElement === document.body);
   await page.mouse.move(100, 100);
-  await page.waitForFunction(() => !document.querySelector("#viewTools").classList.contains("is-visible"));
-  await page.mouse.move(1410, 5);
+  await page.waitForFunction(() => document.querySelector("#viewTools").classList.contains("is-visible"));
   await page.locator("#openControlsButton").click();
   assert.equal(await page.locator("#controlOverlay").isVisible(), true);
   assert.equal(await page.evaluate(() => document.fullscreenElement === document.body), true);
-  await page.locator("#fullscreenButton").click();
+  await page.locator("#dialogFullscreenButton").click();
   await page.waitForFunction(() => !document.fullscreenElement);
   await page.keyboard.press("Escape");
   console.log("PASS: viewing tools reveal on hover/focus, restore focus, and open settings during fullscreen");

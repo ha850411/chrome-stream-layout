@@ -8,6 +8,10 @@ module.exports = async function checkSourceControls(page) {
   const draftUrl = "https://fixture.example/draft";
   const input = (index) => page.locator(`[data-url-input="${index}"]`);
   const fill = (index, value) => input(index).fill(value);
+  const chooseLanguage = async (language) => {
+    await page.locator("#languageButton").click();
+    await page.locator(`#languageMenu [data-language="${language}"]`).click();
+  };
   const frame = (index) => page.locator(`[data-tile="${index}"] iframe`);
   const readSaved = () => page.evaluate(async () => (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY]);
   const waitForSaved = (predicate, value) => page.waitForFunction(predicate, value);
@@ -52,7 +56,53 @@ module.exports = async function checkSourceControls(page) {
   assert.equal(await page.locator('[data-status-container="0"]').getAttribute("data-tone"), "pending");
   assert.equal(await page.locator('[data-retry-slot="0"]').isDisabled(), true);
   assert.deepEqual(await page.evaluate(() => state.slots.map(({ url }) => url)), originalUrls);
-  await page.locator("#languageSelect").selectOption("zh-TW");
+
+  const languageButton = page.locator("#languageButton");
+  const languageMenu = page.locator("#languageMenu");
+  const focusedLanguage = () => page.evaluate(() => document.activeElement.dataset.language);
+  await languageButton.click();
+  assert.equal(await languageButton.getAttribute("aria-expanded"), "true");
+  assert.equal(await languageMenu.getByRole("menuitemradio", { checked: true }).textContent().then((text) => text.trim()), "English");
+  assert.equal(await focusedLanguage(), "en");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await focusedLanguage(), "zh-TW");
+  await page.keyboard.press("ArrowUp");
+  assert.equal(await focusedLanguage(), "en");
+  await page.keyboard.press("Home");
+  assert.equal(await focusedLanguage(), "zh-TW");
+  await page.keyboard.press("End");
+  assert.equal(await focusedLanguage(), "en");
+  await page.keyboard.press("Escape");
+  assert.equal(await languageMenu.isVisible(), false);
+  assert.equal(await page.locator("#controlOverlay").isVisible(), true);
+  assert.equal(await page.evaluate(() => document.activeElement.id), "languageButton");
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await focusedLanguage(), "zh-TW");
+  await page.keyboard.press("Tab");
+  assert.equal(await languageMenu.isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), "reloadAllButton");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Space");
+  assert.equal(await languageMenu.isVisible(), true);
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await languageMenu.isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), "applyButton");
+  await languageButton.click();
+  await page.locator(".dialog-brand").click();
+  assert.equal(await languageMenu.isVisible(), false);
+  await languageButton.focus();
+  await page.keyboard.press("ArrowUp");
+  assert.equal(await focusedLanguage(), "en");
+  await page.keyboard.press("Enter");
+  assert.equal(await languageMenu.isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), "languageButton");
+  assert.equal(await input(0).inputValue(), draftUrl);
+  assert.equal(await page.evaluate(() => originalFrames.every((element) => element.isConnected)), true);
+  console.log("PASS: language menu supports selection, arrows, Home/End, Escape, Tab and outside dismissal while preserving drafts and players");
+
+  await chooseLanguage("zh-TW");
+  assert.equal(await page.locator("#languageValue").textContent(), "繁中");
+  assert.equal(await languageMenu.locator('[data-language="zh-TW"]').getAttribute("aria-checked"), "true");
   assert.equal(await page.locator("#applyButton").textContent(), "套用（1）");
   await page.locator('[data-layout="3"]').click();
   await frame(2).waitFor();
@@ -65,7 +115,7 @@ module.exports = async function checkSourceControls(page) {
   await page.keyboard.press("Escape");
   await page.evaluate(() => openControls());
   assert.equal(await input(0).inputValue(), draftUrl);
-  await page.locator("#languageSelect").selectOption("en");
+  await chooseLanguage("en");
   await page.locator('[data-layout="2"]').click();
   await page.locator("#reloadAllButton").click();
   await page.waitForFunction(() => originalFrames.every((element) => !element.isConnected));
@@ -95,7 +145,7 @@ module.exports = async function checkSourceControls(page) {
   await page.waitForFunction(() => !document.querySelector("#stage iframe"));
   assert.equal(await page.locator("#undoNotice").isVisible(), true);
   assert.equal(await page.locator("#clearButton").isDisabled(), true);
-  await page.locator("#languageSelect").selectOption("zh-TW");
+  await chooseLanguage("zh-TW");
   await page.locator('[data-layout="3"]').click();
   await page.locator("#undoButton").click();
   await frame(2).waitFor();
@@ -108,7 +158,7 @@ module.exports = async function checkSourceControls(page) {
   assert.deepEqual((await readSaved()).slots.map(({ url }) => url), [draftUrl, ...originalUrls.slice(1)]);
   console.log("PASS: discard leaves playback intact; Clear all and Undo restore applied sources and drafts");
 
-  await page.locator("#languageSelect").selectOption("en");
+  await chooseLanguage("en");
   await page.locator('[data-layout="2"]').click();
   await page.waitForFunction(() => [0, 1].every((index) => document.querySelector(`[data-tile="${index}"]`).dataset.status === "sourcePageLoaded"));
   const liveFrame = page.frames().find((element) => element.url() === draftUrl);
@@ -166,6 +216,18 @@ module.exports = async function checkSourceControls(page) {
       const rect = element.getBoundingClientRect();
       return rect.top >= 0 && rect.bottom <= innerHeight && element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
     }), true, `Apply stays visible and clickable at ${viewport.width}x${viewport.height}`);
+    await languageButton.click();
+    assert.equal(await languageMenu.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const option = element.firstElementChild.getBoundingClientRect();
+      return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight &&
+        element.contains(document.elementFromPoint(option.x + option.width / 2, option.y + option.height / 2));
+    }), true, `language menu fits and remains clickable at ${viewport.width}x${viewport.height}`);
+    if (process.env.UI_REVIEW_OUTPUT && [1366, 320].includes(viewport.width)) {
+      await require("node:fs/promises").mkdir(process.env.UI_REVIEW_OUTPUT, { recursive: true });
+      await page.screenshot({ path: require("node:path").join(process.env.UI_REVIEW_OUTPUT, `language-menu-${viewport.width}.png`) });
+    }
+    await page.keyboard.press("Escape");
     await page.locator(".control-dialog").evaluate((element) => { element.scrollTop = element.scrollHeight; });
     assert.equal(await page.locator("#clearButton").isVisible(), true);
     await page.locator(".control-dialog").evaluate((element) => { element.scrollTop = 0; });

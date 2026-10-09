@@ -207,7 +207,12 @@ async function toggleFullscreen() {
     else await surface.requestFullscreen();
   } catch { /* Controls remain usable if the browser declines fullscreen. */ }
 }
-for (const type of ["pointerenter", "pointermove", "pointerdown", "focusin"]) on(surface, type, showControls);
+for (const type of ["pointerenter", "pointermove", "pointerdown", "focusin"]) {
+  on(surface, type, () => {
+    showControls();
+    callbacks.activity?.();
+  });
+}
 on(surface, "pointerleave", () => { if (!optionsOpen && !qualityMenuOpen && !controlsHaveFocus()) hideControls(); });
 on(surface, "focusout", (event) => {
   if (!surface.contains(event.relatedTarget)) { setPlayerOptions(false); hideControls(); }

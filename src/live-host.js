@@ -68,6 +68,9 @@ function createLiveFrame(tile, sourceUrl) {
     host.api = api;
     updateLiveContext(frame);
     api.bind({
+      activity: () => {
+        globalThis.showViewTools?.();
+      },
       edit: () => {
         if (frame.isConnected) openControls(Number(tile.dataset.tile));
       },

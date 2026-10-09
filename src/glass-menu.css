@@ -1,0 +1,51 @@
+/* Shared static glass appearance: menus must not sample live video each frame. */
+.glass-menu {
+  --glass-fill: #141126;
+  --glass-edge: rgba(255, 255, 255, 0.20);
+  padding: 6px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%), var(--glass-fill);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.40), 0 16px 36px rgba(0, 0, 0, 0.50);
+}
+.glass-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+.glass-menu button + button { margin-top: 2px; }
+.glass-menu button[aria-checked="true"] { background: rgba(167, 139, 250, 0.28); color: #ffffff; font-weight: 600; }
+.glass-menu button:hover, .glass-menu button:focus-visible { background-color: rgba(255, 255, 255, 0.14); }
+.glass-menu button:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.glass-menu button:active { transform: scale(0.96); }
+.glass-menu svg { width: 13px; height: 13px; flex-shrink: 0; fill: none; opacity: 0; stroke: var(--accent-strong); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.glass-menu [aria-checked="true"] svg { opacity: 1; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-menu { background: #1c1834; }
+}
+@media (prefers-contrast: more) {
+  .glass-menu { --glass-fill: #141026; --glass-edge: #ffffff80; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-menu button { transition: none; }
+}

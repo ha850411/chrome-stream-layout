@@ -5,6 +5,78 @@ let viewToolsTimer = 0;
 let paneHighlightTimer = 0;
 let sourceMenuResult = null;
 let sourceMenuRevision = 0;
+const languagePicker = document.querySelector("#languagePicker");
+const languageButton = document.querySelector("#languageButton");
+const languageMenu = document.querySelector("#languageMenu");
+
+function syncLanguageMenu() {
+  const selected = state.language === "zh-TW" ? "繁體中文" : "English";
+  document.querySelector("#languageValue").textContent = state.language === "zh-TW" ? "繁中" : "EN";
+  languageButton.title = `${t("language")}: ${selected}`;
+  languageButton.setAttribute("aria-label", languageButton.title);
+  for (const option of languageMenu.children) {
+    option.setAttribute("aria-checked", String(option.dataset.language === state.language));
+  }
+}
+
+function setLanguageMenu(open, returnFocus = false) {
+  languageButton.setAttribute("aria-expanded", String(open));
+  languageMenu.hidden = !open;
+  if (open) languageMenu.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
+  else if (returnFocus) languageButton.focus({ preventScroll: true });
+}
+
+function bindLanguageMenu() {
+  languageButton.addEventListener("click", () => setLanguageMenu(languageMenu.hidden));
+  languageButton.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    setLanguageMenu(true);
+    (event.key === "ArrowUp" ? languageMenu.lastElementChild : languageMenu.firstElementChild).focus();
+  });
+  languageMenu.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-language]");
+    if (!option) return;
+    setLanguageMenu(false, true);
+    const language = normalizeLanguage(option.dataset.language);
+    if (language === state.language) return;
+    state.language = language;
+    applyLanguage();
+    renderControls();
+    void renderStage();
+    void persistState(t("languageChanged"));
+  });
+  languageMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setLanguageMenu(false, true);
+      return;
+    }
+    if (event.key === "Tab") {
+      // Let the dialog's focus trap and normal tab order continue from the trigger.
+      setLanguageMenu(false, true);
+      return;
+    }
+    const options = [...languageMenu.children];
+    const index = options.indexOf(document.activeElement);
+    let next;
+    if (event.key === "ArrowDown") next = options[(index + 1) % options.length];
+    else if (event.key === "ArrowUp") next = options[(index - 1 + options.length) % options.length];
+    else if (event.key === "Home") next = options[0];
+    else if (event.key === "End") next = options.at(-1);
+    else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      next = options.find((option) => option.textContent.trim().toLowerCase().startsWith(event.key.toLowerCase()));
+    }
+    if (next) { event.preventDefault(); next.focus(); }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!languageMenu.hidden && !languagePicker.contains(event.target)) setLanguageMenu(false);
+  });
+  languagePicker.addEventListener("focusout", (event) => {
+    if (!languagePicker.contains(event.relatedTarget)) setLanguageMenu(false);
+  });
+}
 
 function showViewTools() {
   const tools = document.querySelector("#viewTools");
@@ -27,6 +99,10 @@ function bindViewingControls() {
   const tools = document.querySelector("#viewTools");
   for (const name of ["pointerenter", "pointerleave", "focusin", "focusout"]) {
     tools.addEventListener(name, showViewTools);
+  }
+  for (const name of ["pointermove", "pointerenter", "pointerdown"]) {
+    document.addEventListener(name, showViewTools, { passive: true });
+    stage.addEventListener(name, showViewTools, { passive: true });
   }
   document.querySelector("#openControlsButton").addEventListener("click", () => openControls());
   document.querySelector("#viewFullscreenButton").addEventListener("click", toggleFullscreen);

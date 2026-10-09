@@ -197,6 +197,14 @@
     }
   });
 
+  let lastPointerActivity = 0;
+  window.addEventListener("pointermove", () => {
+    const now = Date.now();
+    if (now - lastPointerActivity < 600) return;
+    lastPointerActivity = now;
+    send("chrome-stream-layout:pointer-activity", {});
+  }, { passive: true });
+
   if (!document.hidden) { startTitleTracking(); startMediaTracking(); }
   else suspended = true;
 })();

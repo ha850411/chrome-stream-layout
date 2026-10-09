@@ -15,6 +15,9 @@ module.exports = async function checkStorage(context, page, base) {
   try {
     await other.goto(`${base}/dashboard.html`);
     await other.waitForFunction((url) => state.slots[0].url === url && document.querySelectorAll("[data-tile]").length === 4, a);
+    // Tiles exist before asynchronous source loading installs their iframes.
+    // Capture the actual player before checking that later changes preserve it.
+    await other.waitForFunction((url) => document.querySelector('[data-tile="0"] iframe')?.dataset.sourceUrl === url, a);
     await other.evaluate(() => { openControls(0); window.unchangedFrame = document.querySelector('[data-tile="0"] iframe'); });
     await other.locator('[data-url-input="0"]').fill("https://fixture.example/local-draft");
     await page.evaluate(async () => { state.slots[1].url = "https://fixture.example/from-a"; await persistState(""); await renderStage(); });

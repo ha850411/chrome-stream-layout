@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Live player</title>
   <link rel="stylesheet" href="src/live-player.css">
+  <link rel="stylesheet" href="src/glass-menu.css">
 </head>
 <body>
   <main id="player" tabindex="0">
@@ -12,27 +13,61 @@
     <div class="player-shade" aria-hidden="true"></div>
     <div class="player-feedback">
       <div class="player-feedback-card glass-surface">
-        <div class="feedback-mascot" aria-hidden="true">
-          <svg class="mascot-face" viewBox="0 0 40 40" width="36" height="36">
-            <path class="cat-ear ear-left" d="M8 13 L14 4 L18 13 Z" fill="#c4b5fd" />
-            <path class="cat-ear ear-right" d="M32 13 L26 4 L22 13 Z" fill="#c4b5fd" />
-            <rect class="cat-screen" x="6" y="11" width="28" height="23" rx="8" fill="#1e183a" stroke="#a78bfa" stroke-width="2"/>
-            <g class="eyes-loading">
-              <ellipse cx="15" cy="22" rx="2.5" ry="3" fill="#ffffff"/>
-              <ellipse cx="25" cy="22" rx="2.5" ry="3" fill="#ffffff"/>
-              <circle cx="16" cy="21" r="1" fill="#c4b5fd"/>
-              <circle cx="26" cy="21" r="1" fill="#c4b5fd"/>
-              <path d="M19 25 Q20 26.5 21 25" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            </g>
-            <g class="eyes-sleeping">
-              <path d="M13 22 Q15 25 17 22" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
-              <path d="M23 22 Q25 25 27 22" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
-              <circle cx="11" cy="24" r="2" fill="#f472b6" opacity="0.6"/>
-              <circle cx="29" cy="24" r="2" fill="#f472b6" opacity="0.6"/>
-            </g>
-          </svg>
+        <div class="feedback-indicator" aria-hidden="true">
+          <div class="loading-ring-wrap">
+            <svg class="loading-ring" viewBox="0 0 44 44" width="38" height="38">
+              <circle class="ring-track" cx="22" cy="22" r="18" fill="none" stroke="rgba(255, 255, 255, 0.1)" stroke-width="2.5"/>
+              <circle class="ring-spinner" cx="22" cy="22" r="18" fill="none" stroke="url(#ring-grad)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="68 45"/>
+              <defs>
+                <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#c4b5fd"/>
+                  <stop offset="55%" stop-color="#a78bfa"/>
+                  <stop offset="100%" stop-color="#f472b6"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="indicator-mascot">
+              <svg viewBox="0 0 32 32" width="20" height="20">
+                <polygon points="4,10 7,2 12,8" fill="#18132e"/>
+                <polygon points="5,9 7,4 10,7" fill="#ff708f"/>
+                <polygon points="28,10 25,2 20,8" fill="#18132e"/>
+                <polygon points="27,9 25,4 22,7" fill="#ff708f"/>
+                <rect x="2" y="7" width="28" height="23" rx="6" fill="#18132e"/>
+                <rect x="4" y="9" width="11" height="9" rx="2" fill="#9a62ff"/>
+                <rect x="17" y="9" width="11" height="9" rx="2" fill="#05d672"/>
+                <rect x="4" y="19" width="11" height="9" rx="2" fill="#ff4d6a"/>
+                <rect x="17" y="19" width="11" height="9" rx="2" fill="#ffbe1a"/>
+                <rect x="9" y="13" width="14" height="11" rx="5.5" fill="#ffffff" stroke="#18132e" stroke-width="1.2"/>
+                <circle cx="13" cy="18" r="1.2" fill="#18132e"/>
+                <circle cx="19" cy="18" r="1.2" fill="#18132e"/>
+                <path d="M15 20 Q16 21.5 17 20" stroke="#18132e" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="error-mascot-wrap">
+            <svg viewBox="0 0 44 44" width="40" height="40">
+              <polygon points="6,15 11,3 18,12" fill="#18132e"/>
+              <polygon points="8,14 11,6 15,11" fill="#ff708f"/>
+              <polygon points="38,15 33,3 26,12" fill="#18132e"/>
+              <polygon points="36,14 33,6 29,11" fill="#ff708f"/>
+              <rect x="3" y="10" width="38" height="31" rx="8" fill="#18132e" stroke="#352b5e" stroke-width="2"/>
+              <rect x="6" y="13" width="32" height="25" rx="6" fill="#131024"/>
+              <rect x="12" y="19" width="20" height="13" rx="6.5" fill="#ffffff" stroke="#18132e" stroke-width="1.5"/>
+              <path d="M16 25 Q18 28 20 25" stroke="#18132e" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <path d="M24 25 Q26 28 28 25" stroke="#18132e" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <circle cx="14" cy="27" r="1.5" fill="#ff7a99" opacity="0.8"/>
+              <circle cx="30" cy="27" r="1.5" fill="#ff7a99" opacity="0.8"/>
+            </svg>
+          </div>
         </div>
-        <p id="message" role="status"></p>
+        <div class="feedback-body">
+          <p id="message" role="status"></p>
+          <div class="loading-dots" aria-hidden="true">
+            <span class="dot dot-1"></span>
+            <span class="dot dot-2"></span>
+            <span class="dot dot-3"></span>
+          </div>
+        </div>
         <div id="errorActions" class="error-actions" hidden>
           <button id="retrySource" type="button">重試</button>
           <button id="editSource" type="button">編輯來源</button>
@@ -71,7 +106,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
       </button>
     </div>
-    <div id="qualityMenu" class="quality-menu glass-surface" role="menu" aria-labelledby="qualityLabel" hidden></div>
+    <div id="qualityMenu" class="quality-menu glass-menu" role="menu" aria-labelledby="qualityLabel" hidden></div>
   </main>
   <script src="src/vendor/ivs/amazon-ivs-player.min.js"></script>
   <script src="src/live-engine.js"></script>

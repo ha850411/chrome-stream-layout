@@ -160,7 +160,7 @@ const os = require("node:os");
     });
     await page.locator("#applyButton").focus();
     await page.keyboard.press("Tab");
-    assert.equal(await page.evaluate(() => document.activeElement.id), "languageSelect");
+    assert.equal(await page.evaluate(() => document.activeElement.id), "languageButton");
     await page.keyboard.press("Shift+Tab");
     assert.equal(await page.evaluate(() => document.activeElement.id), "applyButton");
     assert.equal(await page.locator(".app-shell").evaluate((el) => el.inert), true);

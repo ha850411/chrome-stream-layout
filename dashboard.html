@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Stream Layout</title>
     <link rel="stylesheet" href="src/dashboard.css">
+    <link rel="stylesheet" href="src/glass-menu.css">
   </head>
   <body>
     <nav class="view-tools" id="viewTools" aria-label="Viewing controls">
@@ -34,16 +35,28 @@
               </div>
             </div>
             <div class="dialog-head-actions">
-              <select class="language-select" id="languageSelect" aria-label="Language" title="Language">
-                <option value="zh-TW">繁中</option>
-                <option value="en">EN</option>
-              </select>
+              <div class="language-picker" id="languagePicker">
+                <button class="language-button" id="languageButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="languageMenu" aria-label="Language" title="Language">
+                  <span id="languageValue">EN</span>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                </button>
+                <div class="language-menu glass-menu" id="languageMenu" role="menu" aria-labelledby="languageButton" hidden>
+                  <button type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-language="zh-TW" lang="zh-Hant">
+                    <span>繁體中文</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>
+                  </button>
+                  <button type="button" role="menuitemradio" aria-checked="true" tabindex="-1" data-language="en" lang="en">
+                    <span>English</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7"/></svg>
+                  </button>
+                </div>
+              </div>
               <button class="icon-button" id="reloadAllButton" type="button" title="Reload all" aria-label="Reload all">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M21 12a9 9 0 0 1-15.4 6.4M3 12A9 9 0 0 1 18.4 5.6"></path>
                   <path d="M18 2v4h4M6 22v-4H2"></path>
                 </svg>
               </button>
+
+              <button class="icon-button" id="dialogFullscreenButton" type="button" title="Layout fullscreen" aria-label="Layout fullscreen"></button>
 
               <button class="icon-button" id="closeControlsButton" type="button" title="Close" aria-label="Close">
                 <svg viewBox="0 0 24 24" aria-hidden="true">

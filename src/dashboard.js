@@ -40,10 +40,10 @@ const fullscreenButton = document.querySelector("#fullscreenButton");
 const maximizeLayoutButton = document.querySelector("#maximizeLayoutButton");
 const maximizeLayoutLabel = document.querySelector("#maximizeLayoutLabel");
 const reloadAllButton = document.querySelector("#reloadAllButton");
+const dialogFullscreenButton = document.querySelector("#dialogFullscreenButton");
 const closeControlsButton = document.querySelector("#closeControlsButton");
 const applyButton = document.querySelector("#applyButton");
 const controlsSubtitle = document.querySelector("#controlsSubtitle");
-const languageSelect = document.querySelector("#languageSelect");
 const draftNotice = document.querySelector("#draftNotice");
 const pendingStatus = document.querySelector("#pendingStatus");
 const discardButton = document.querySelector("#discardButton");
@@ -62,6 +62,7 @@ async function init() {
   applyLanguage();
   renderControls();
   bindEvents();
+  bindLanguageMenu();
   bindExternalEvents();
   bindViewingControls();
   document.querySelector("#retrySaveButton").addEventListener("click", () => { void retryStorage(); });
@@ -181,12 +182,18 @@ function bindEvents() {
 
   reloadAllButton.addEventListener("click", reloadAllTiles);
   fullscreenButton.addEventListener("click", toggleFullscreen);
+  dialogFullscreenButton?.addEventListener("click", toggleFullscreen);
   maximizeLayoutButton.addEventListener("click", maximizeLayout);
   document.addEventListener("fullscreenchange", syncFullscreenState);
   window.addEventListener("resize", syncViewportState, { passive: true });
   window.addEventListener("message", (event) => {
     if (event.data?.type === "chrome-stream-layout:youtube-embed-error") {
       fallbackFromYouTubeEmbed(event);
+      return;
+    }
+
+    if (event.data?.type === "chrome-stream-layout:pointer-activity") {
+      showViewTools();
       return;
     }
 
@@ -204,14 +211,6 @@ function bindEvents() {
       void renderStage();
       void persistState(t("layoutChanged", { number: state.layout }));
     });
-  });
-
-  languageSelect.addEventListener("change", () => {
-    state.language = normalizeLanguage(languageSelect.value);
-    applyLanguage();
-    renderControls();
-    void renderStage();
-    void persistState(t("languageChanged"));
   });
 
   stage.addEventListener("pointerdown", startResize);
@@ -434,7 +433,7 @@ function renderControls() {
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
-  languageSelect.value = state.language;
+  syncLanguageMenu();
   updateDraftControls();
 }
 
@@ -1015,6 +1014,7 @@ function syncStateFromForm() {
 
 function openControls(index = null) {
   if (controlOverlay.hidden) focusBeforeControls = document.activeElement;
+  setLanguageMenu(false);
   if (Number.isInteger(index) && index >= 0 && index < SLOT_COUNT) {
     if (index >= state.layout) unusedSourcesExpanded = true;
   }
@@ -1034,6 +1034,7 @@ function openControls(index = null) {
 }
 
 function closeControls() {
+  setLanguageMenu(false);
   controlOverlay.hidden = true;
   clearSourceMenuNotice();
   clearPaneHighlight();
@@ -1137,6 +1138,12 @@ function syncFullscreenState() {
   viewingButton.innerHTML = isFullscreen ? ICONS.minimize : ICONS.maximize;
   viewingButton.title = fullscreenButton.title;
   viewingButton.setAttribute("aria-label", fullscreenButton.title);
+
+  if (dialogFullscreenButton) {
+    dialogFullscreenButton.innerHTML = isFullscreen ? ICONS.minimize : ICONS.maximize;
+    dialogFullscreenButton.title = fullscreenButton.title;
+    dialogFullscreenButton.setAttribute("aria-label", fullscreenButton.title);
+  }
 
   syncViewportState();
 }
@@ -1342,8 +1349,7 @@ function flushTileFrameViewportChange() {
 function applyLanguage() {
   document.documentElement.lang = state.language === "zh-TW" ? "zh-Hant" : "en";
   controlsSubtitle.textContent = t("sourcesAndLayout");
-  languageSelect.title = t("language");
-  languageSelect.setAttribute("aria-label", t("language"));
+  syncLanguageMenu();
   clearButton.textContent = t("clearAll");
   discardButton.textContent = t("discardChanges");
   undoButton.textContent = t("undo");

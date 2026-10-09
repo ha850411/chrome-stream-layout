@@ -211,8 +211,12 @@ button {
   opacity: 0; 
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms cubic-bezier(0.16, 1, 0.3, 1); 
 }
-.view-tools:is(.is-visible, :has(:focus-visible)) .view-tools-bar { transform: translateY(8px); opacity: 1; }
-.view-tools:is(.is-visible, :has(:focus-visible))::after { opacity: 0; }
+body:has(.stage:hover) .view-tools .view-tools-bar,
+body:has(.tile:hover) .view-tools .view-tools-bar,
+.view-tools:is(.is-visible, :hover, :has(:focus-visible)) .view-tools-bar { transform: translateY(8px); opacity: 1; }
+body:has(.stage:hover) .view-tools::after,
+body:has(.tile:hover) .view-tools::after,
+.view-tools:is(.is-visible, :hover, :has(:focus-visible))::after { opacity: 0; }
 .view-tools button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 6px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font: inherit; font-size: 13px; font-weight: 550; white-space: nowrap; transition: background 140ms ease; }
 .view-tools button:hover { background: rgba(255, 255, 255, 0.12); }
 .view-tools button svg { width: 18px; height: 18px; fill: currentColor; }
@@ -428,6 +432,8 @@ body:is(.is-browser-fullscreen, .is-layout-maximized) .stage {
   grid-auto-rows: initial;
 }
 
+/* Live video changes every frame. Keep the overlay, panel and sticky footer
+   free of backdrop filters so opening controls does not add nested blur passes. */
 .control-overlay {
   position: fixed;
   inset: 0;
@@ -436,8 +442,6 @@ body:is(.is-browser-fullscreen, .is-layout-maximized) .stage {
   place-items: start end;
   padding: 14px;
   background: radial-gradient(circle at 80% 20%, rgba(167, 139, 250, 0.08) 0%, transparent 60%), rgba(5, 4, 14, 0.45);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 
 [hidden] { display: none !important; }
@@ -451,10 +455,8 @@ body:is(.is-browser-fullscreen, .is-layout-maximized) .stage {
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 26px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.03) 100%), rgba(20, 17, 38, 0.72);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.03) 100%), #141126;
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(36px) saturate(190%) contrast(105%);
-  backdrop-filter: blur(36px) saturate(190%) contrast(105%);
 }
 
 .stream-form {
@@ -508,7 +510,12 @@ body:is(.is-browser-fullscreen, .is-layout-maximized) .stage {
 }
 .dialog-head-actions .icon-button svg { width: 16px; height: 16px; }
 
-.language-select {
+.language-picker { position: relative; flex-shrink: 0; }
+.language-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   width: 72px;
   height: 34px;
   padding: 0 8px;
@@ -521,13 +528,15 @@ body:is(.is-browser-fullscreen, .is-layout-maximized) .stage {
   font-weight: 600;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: all 140ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
-.language-select:hover {
+.language-button:hover {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.28);
 }
-.language-select option { background: #1c1834; color: var(--text); }
+.language-button[aria-expanded="true"] { background-color: rgba(167, 139, 250, 0.25); border-color: rgba(167, 139, 250, 0.5); }
+.language-button svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .75; }
+.language-menu { position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; width: 136px; max-height: calc(100dvh - 100px); }
 
 button:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--accent-strong);
@@ -610,7 +619,7 @@ button:disabled { cursor: default; }
   transform: translateY(-0.5px); 
 }
 .maximize-layout-button svg { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-#fullscreenIcon { display: inline-flex; }
+#fullscreenIcon { display: inline-flex; align-items: center; justify-content: center; }
 
 .slot-controls, .unused-source-list { display: grid; gap: 8px; min-width: 0; }
 .slot-control {
@@ -743,10 +752,8 @@ body.is-reordering { user-select: none; }
   margin: -2px -16px -16px; 
   padding: 12px 16px 16px; 
   border-top: 1px solid rgba(255, 255, 255, 0.12); 
-  background: linear-gradient(180deg, rgba(20, 17, 38, 0.65) 0%, rgba(16, 13, 32, 0.94) 100%); 
+  background: linear-gradient(180deg, #201c35 0%, #100d20 100%);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.25); 
-  -webkit-backdrop-filter: blur(24px) saturate(180%); 
-  backdrop-filter: blur(24px) saturate(180%); 
 }
 .form-actions { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 #saveStatus { min-width: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
@@ -778,7 +785,7 @@ body.is-reordering { user-select: none; }
 .draft-notice .text-button, .undo-notice .text-button { flex-shrink: 0; color: inherit; }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .control-dialog, .form-footer, .view-tools-bar { background: #1d2631; }
+  .view-tools-bar { background: #1d2631; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .control-dialog, .form-footer, .view-tools-bar { background: #1d2631; -webkit-backdrop-filter: none; backdrop-filter: none; }
