@@ -2,8 +2,8 @@
 
 help:
 	@echo "可用指令:"
-	@echo "  make pack         - 快速打包擴充功能成 zip (並同步複製到 Windows 桌面)"
-	@echo "  make clean        - 清除本地打包產生的 zip 檔案"
+	@echo "  make pack         - 快速打包擴充功能成 zip (輸出至專案內 dist/ 目錄，檔名含 hash 與 YmdHis 日期)"
+	@echo "  make clean        - 清除本地打包產生的 zip 檔案與 dist 目錄"
 	@echo "  make test         - 執行單元測試"
 	@echo "  make test-browser - 執行瀏覽器整合測試"
 	@echo "  make icons        - 重新生成擴充功能圖示"
@@ -14,8 +14,8 @@ pack:
 
 # 清理產出
 clean:
-	@rm -f chrome-stream-layout.zip
-	@echo "🧹 已清理本地 zip 檔案"
+	@rm -rf dist *.zip
+	@echo "🧹 已清理本地打包產出的 zip 檔案與 dist 目錄"
 
 # 執行測試
 test:
