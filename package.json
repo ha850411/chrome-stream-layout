@@ -1,0 +1,14 @@
+{
+  "name": "chrome-stream-layout",
+  "version": "1.5.0",
+  "private": true,
+  "description": "Chrome/Edge extension for watching multiple video sources",
+  "engines": { "node": ">=18.19" },
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node tests/browser.cjs",
+    "test:live": "node tests/twitch-live.cjs",
+    "benchmark": "node tests/performance.cjs"
+  },
+  "devDependencies": { "playwright": "1.58.2" }
+}

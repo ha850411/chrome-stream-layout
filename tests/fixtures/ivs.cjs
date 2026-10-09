@@ -27,7 +27,11 @@ module.exports = function installIVSFixture() {
         setAutoplay(value) { auto = value; },
         setMuted(value) { video.muted = value; },
         setVolume(value) { video.volume = value; },
-        getQualities() { return [{ height: 360, width: 640, framerate: 30 }, { height: 1080, width: 1920, framerate: 60 }]; },
+        getQualities() { return [
+          { height: 360, width: 640, framerate: 30 }, { height: 1080, width: 1920, framerate: 60 },
+          { height: 720, width: 1280, framerate: 60 }, { height: 480, width: 854, framerate: 30 },
+          { height: 160, width: 284, framerate: 30 }
+        ]; },
         setQuality(q) { current = q; canvas.width = q.width; canvas.height = q.height; paint(); },
         setAutoQualityMode() { this.setQuality(this.getQualities()[0]); },
         getQuality() { return current; },

@@ -78,7 +78,7 @@ async function main() {
     assert.ok(first.url().startsWith(`${base}/live-player.html`));
     assert.ok(second.url().startsWith(`${base}/live-player.html`));
     pass("Two local IVS panes play the real Twitch stream without signing in");
-    report.qualities = await first.locator("#quality option").evaluateAll((options) => options.map((option) => option.value));
+    report.qualities = await first.locator("#qualityMenu [role=menuitemradio]").evaluateAll((options) => options.map((option) => option.value));
     await first.evaluate(() => { window.experimentWaiting = 0; video.addEventListener("waiting", () => experimentWaiting++); });
     report.samples.push(await sample(first));
     for (let i = 0; i < 6; i++) {
@@ -97,7 +97,8 @@ async function main() {
     assert.ok(low && high && low !== high, "Live stream must offer at least two video qualities");
     for (const value of [low, high, "auto"]) {
       await reveal(first);
-      await first.locator("#quality").selectOption(value);
+      await first.locator("#quality").click();
+      await first.locator(`#qualityMenu [value="${value}"]`).click();
       if (value !== "auto") await first.waitForFunction((height) => video.videoHeight === height, parseInt(value, 10), { timeout: 30000 });
       else assert.equal(await first.evaluate(() => engine.player.isAutoQualityMode()), true);
       // Returning to Auto can reattach the media element. Wait for playback,
@@ -111,7 +112,8 @@ async function main() {
 
     const preferred = options.find((value) => value.startsWith("720p")) || low;
     await reveal(first);
-    await first.locator("#quality").selectOption(preferred);
+    await first.locator("#quality").click();
+    await first.locator(`#qualityMenu [value="${preferred}"]`).click();
     await first.waitForFunction((height) => video.videoHeight === height, parseInt(preferred, 10), { timeout: 30000 });
     await playing(first);
     await reveal(first);

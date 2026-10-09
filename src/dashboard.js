@@ -1,192 +1,10 @@
 "use strict";
 
-const STORAGE_KEY = "chrome-stream-layout-state-v1";
 const OPEN_CONTROLS_KEY = "chrome-stream-layout-open-controls-request-v1";
 const OPEN_CONTROLS_MAX_AGE_MS = 10000;
 const FRAME_VIEWPORT_NOTIFY_DELAY_MS = 100;
-const PREVIOUS_STORAGE_KEY = "live-mosaic-state-v2";
-const LEGACY_STORAGE_KEY = "live-mosaic-state-v1";
-const SLOT_COUNT = 4;
-const SOURCE_RESOLVE_TIMEOUT_MS = 8000;
 const FRAME_LOAD_TIMEOUT_MS = 20000;
 const TILE_PLAYER_SELECTOR = "iframe[data-tile-frame]";
-const BILIBILI_ROOM_INIT_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/room_init";
-const BILIBILI_ROOM_INFO_ENDPOINT = "https://api.live.bilibili.com/room/v1/Room/get_info";
-const YESLIVE_THEATER_VIEWPORT = {
-  width: 1920,
-  height: 1080
-};
-const SUPPORTED_LANGUAGES = ["zh-TW", "en"];
-const DEFAULT_STATE = {
-  language: "en",
-  layout: 4,
-  sizes: {
-    layout2: { col: 50 },
-    layout3: { col: 66, row: 50 },
-    layout4: { col: 50, row: 50 }
-  },
-  slots: Array.from({ length: SLOT_COUNT }, () => ({ url: "", title: "" }))
-};
-
-const TRANSLATIONS = {
-  en: {
-    reloadAll: "Reload all",
-    layoutFullscreen: "Layout fullscreen",
-    exitLayoutFullscreen: "Exit layout fullscreen",
-    maximizeLayout: "Maximize current layout",
-    layoutMaximized: "Layout maximized",
-    close: "Close",
-    sourcesAndLayout: "Sources and layout",
-    language: "Language",
-    paneCount: "Pane count",
-    pane: "Pane {number}",
-    panePosition: "Pane {number}, {position}",
-    unusedPosition: "Not in current layout",
-    left: "Left",
-    right: "Right",
-    topLeft: "Top left",
-    topRight: "Top right",
-    bottomLeft: "Bottom left",
-    bottomRight: "Bottom right",
-    positionsSwapped: "Swapped panes {from} and {to}",
-    idle: "Idle",
-    clearAll: "Clear all",
-    undo: "Undo",
-    restored: "Sources restored",
-    discardChanges: "Discard changes",
-    pendingChanges: "Sources not applied: {number}",
-    applyChanges: "Apply ({number})",
-    done: "Done",
-    unusedSources: "Unused sources ({number})",
-    pendingSource: "Not applied",
-    newSource: "Add a stream source",
-    reloadPane: "Reload pane {number}",
-    reload: "Reload",
-    refreshStream: "LIVE",
-    refreshStreamPane: "Return pane {number} to the live broadcast",
-    streamQuality: "Stream quality",
-    automaticQuality: "Auto",
-    applyFirst: "Apply source changes first",
-    layout2: "Side by side",
-    layout3: "Main + two",
-    layout4: "Grid",
-    layoutOption: "{number} panes · {name}",
-    reorderHint: "Reorder source {number}: drag or press Alt + Up/Down",
-    clearPane: "Clear pane {number}",
-    applied: "Applied",
-    cleared: "Cleared",
-    layoutChanged: "Layout {number}",
-    languageChanged: "Language changed",
-    resized: "Resized",
-    resetSplit: "Split reset",
-    noSource: "No source set",
-    cannotLoad: "Cannot load",
-    enterCompleteUrl: "Enter a complete URL.",
-    httpOnly: "Only http and https sources are supported.",
-    retryPane: "Retry pane {number}",
-    retry: "Retry",
-    sourcePending: "Apply to load this source",
-    sourceRemoving: "Apply to remove this source",
-    sourceResolving: "Resolving source…",
-    sourceLoading: "Loading page…",
-    sourcePageLoaded: "Page loaded · playback unconfirmed",
-    sourcePlaying: "Playing",
-    sourcePaused: "Paused",
-    sourceBuffering: "Buffering…",
-    sourceReconnecting: "Reconnecting… You can press LIVE to retry now.",
-    sourceWaitingNetwork: "Waiting for the network to reconnect…",
-    sourceRecoveryFailed: "Automatic recovery stopped. Press LIVE to try again.",
-    sourceMediaError: "Video could not play · retry or check the source",
-    sourceLoadUnconfirmed: "Loading is taking longer than expected · try again",
-    sourceFailed: "Could not load this source. Try again.",
-    sourceTimeout: "Source lookup timed out. Try again.",
-    sourceOffline: "This channel is offline. Press LIVE when it starts.",
-    sourceRestricted: "Playback is restricted or unavailable for this source. Try LIVE again later.",
-    rulesFailed: "Playback setup failed. Use Retry or Reload all to try again.",
-    video: "Video",
-    dragWidth: "Drag to resize width",
-    dragHeight: "Drag to resize height"
-  },
-  "zh-TW": {
-    reloadAll: "全部重新載入",
-    layoutFullscreen: "版面全螢幕",
-    exitLayoutFullscreen: "離開版面全螢幕",
-    maximizeLayout: "最大化目前配置",
-    layoutMaximized: "已最大化目前配置",
-    close: "關閉",
-    sourcesAndLayout: "來源與版面",
-    language: "介面語言",
-    paneCount: "窗格數量",
-    pane: "窗格 {number}",
-    panePosition: "窗格 {number}，{position}",
-    unusedPosition: "目前版面不顯示",
-    left: "左側",
-    right: "右側",
-    topLeft: "左上",
-    topRight: "右上",
-    bottomLeft: "左下",
-    bottomRight: "右下",
-    positionsSwapped: "已交換窗格 {from} 與 {to}",
-    idle: "未使用",
-    clearAll: "清除全部",
-    undo: "復原",
-    restored: "已復原來源",
-    discardChanges: "還原變更",
-    pendingChanges: "有 {number} 個來源尚未套用",
-    applyChanges: "套用（{number}）",
-    done: "完成",
-    unusedSources: "未使用來源（{number}）",
-    pendingSource: "尚未套用",
-    newSource: "新增直播來源",
-    reloadPane: "重新載入窗格 {number}",
-    reload: "重新載入",
-    refreshStream: "LIVE",
-    refreshStreamPane: "將窗格 {number} 接回最新直播",
-    streamQuality: "直播畫質",
-    automaticQuality: "自動",
-    applyFirst: "請先套用來源變更",
-    layout2: "雙畫面",
-    layout3: "主副畫面",
-    layout4: "四宮格",
-    layoutOption: "{number} 個窗格・{name}",
-    reorderHint: "調整來源 {number} 順序：拖曳或按 Alt + 上下方向鍵",
-    clearPane: "清除窗格 {number}",
-    applied: "已套用",
-    cleared: "已清除",
-    layoutChanged: "已切換為 {number} 個窗格",
-    languageChanged: "已切換語言",
-    resized: "已調整大小",
-    resetSplit: "已重設分隔線",
-    noSource: "尚未設定來源",
-    cannotLoad: "無法載入",
-    enterCompleteUrl: "請輸入完整網址。",
-    httpOnly: "僅支援 http 與 https 來源。",
-    retryPane: "重試窗格 {number}",
-    retry: "重試",
-    sourcePending: "套用後載入此來源",
-    sourceRemoving: "套用後移除此來源",
-    sourceResolving: "正在解析來源…",
-    sourceLoading: "正在載入頁面…",
-    sourcePageLoaded: "頁面已載入・尚未確認播放",
-    sourcePlaying: "播放中",
-    sourcePaused: "已暫停",
-    sourceBuffering: "緩衝中…",
-    sourceReconnecting: "正在重新連線…也可按 LIVE 立即重試。",
-    sourceWaitingNetwork: "等待網路恢復後重新連線…",
-    sourceRecoveryFailed: "自動恢復已停止，可按 LIVE 再試一次。",
-    sourceMediaError: "影片無法播放，請重試或檢查來源",
-    sourceLoadUnconfirmed: "載入時間較長，可按重試重新載入",
-    sourceFailed: "無法載入此來源，請重試。",
-    sourceTimeout: "來源解析逾時，請重試。",
-    sourceOffline: "此頻道尚未開播，開播後可按 LIVE。",
-    sourceRestricted: "此來源限制播放或暫時無法取得串流，請稍後按 LIVE 重試。",
-    rulesFailed: "播放設定未成功，請按「重試」或「全部重新載入」。",
-    video: "影片",
-    dragWidth: "拖曳以調整寬度",
-    dragHeight: "拖曳以調整高度"
-  }
-};
-
 const ICONS = {
   clear: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>',
   grip: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="6" r="1"></circle><circle cx="16" cy="6" r="1"></circle><circle cx="8" cy="12" r="1"></circle><circle cx="16" cy="12" r="1"></circle><circle cx="8" cy="18" r="1"></circle><circle cx="16" cy="18" r="1"></circle></svg>',
@@ -202,6 +20,7 @@ let unusedSourcesExpanded = false;
 let saveTimer = 0;
 const tileLoads = new WeakMap();
 const frameLoadTimers = new Map();
+const compatibilityFrames = new Map();
 let frameRulesFailed = false;
 let focusBeforeControls = null;
 let frameViewportNotifyTimer = 0;
@@ -210,8 +29,6 @@ let frameViewportNotifyReason = "layout";
 let draggedSlotIndex = null;
 let previewSlotIndex = null;
 let dragSlotRects = [];
-const bilibiliRoomIdCache = new Map();
-
 const stage = document.querySelector("#stage");
 const fullscreenTarget = document.body;
 const controlOverlay = document.querySelector("#controlOverlay");
@@ -241,17 +58,21 @@ const fixedViewportObserver = new ResizeObserver(updateFixedViewportScales);
 init();
 
 async function init() {
-  state = normalizeState(await readState());
+  state = await initializeStorage();
   applyLanguage();
   renderControls();
   bindEvents();
   bindExternalEvents();
+  bindViewingControls();
+  document.querySelector("#retrySaveButton").addEventListener("click", () => { void retryStorage(); });
+  if (storageIssue) showStorageIssue(storageIssue);
   await ensureFrameHeaderRules();
   void renderStage();
 
   if (consumeOpenControlsRequestFromUrl() || await hasRecentOpenControlsRequest()) {
     openControls();
   }
+  await consumeSourceMenuResult();
 }
 
 function bindEvents() {
@@ -261,7 +82,7 @@ function bindEvents() {
     renderControls();
     void renderStage();
     void persistState(t("applied"));
-    closeControls();
+    if (storageReady) closeControls();
   });
 
   slotControls.addEventListener("click", (event) => {
@@ -411,6 +232,7 @@ function bindExternalEvents() {
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && changes[STORAGE_KEY]) void syncSharedState();
     if (areaName === "local" && changes[OPEN_CONTROLS_KEY]?.newValue) {
       openControls();
     }
@@ -423,7 +245,9 @@ async function ensureFrameHeaderRules() {
   }
 
   try {
-    const response = await chrome.runtime.sendMessage({ type: "ensure-frame-header-rules" });
+    const origins = [...new Set([...compatibilityFrames].filter(([tile]) => tile.isConnected &&
+      Number(tile.dataset.tile) < state.layout && tile.dataset.sourceUrl === state.slots[Number(tile.dataset.tile)].url).map(([, origin]) => origin))];
+    const response = await chrome.runtime.sendMessage({ type: "ensure-frame-header-rules", origins });
     if (!response?.ok) throw new Error(response?.error || "Frame rules were not installed.");
     frameRulesFailed = false;
   } catch {
@@ -459,10 +283,11 @@ async function hasRecentOpenControlsRequest() {
     return false;
   }
 
-  const result = await chrome.storage.local.get(OPEN_CONTROLS_KEY);
-  const requestedAt = Number(result[OPEN_CONTROLS_KEY]);
-
-  return Number.isFinite(requestedAt) && Date.now() - requestedAt < OPEN_CONTROLS_MAX_AGE_MS;
+  try {
+    const result = await chrome.storage.local.get(OPEN_CONTROLS_KEY);
+    const requestedAt = Number(result[OPEN_CONTROLS_KEY]);
+    return Number.isFinite(requestedAt) && Date.now() - requestedAt < OPEN_CONTROLS_MAX_AGE_MS;
+  } catch { return false; }
 }
 
 function getEditableSlot(index) {
@@ -487,6 +312,7 @@ function updateDraftControls() {
 }
 
 function renderControls() {
+  clearPaneHighlight();
   slotControls.replaceChildren();
   let unusedList = null;
   if (state.layout < SLOT_COUNT) {
@@ -524,23 +350,14 @@ function renderControls() {
 
     const heading = document.createElement("div");
     heading.className = "slot-heading";
-    const title = document.createElement("label");
+    const title = document.createElement("div");
     title.className = "slot-title";
-    title.htmlFor = `slot-url-${index}`;
     title.dataset.slotTitle = String(index);
     title.dir = "auto";
-    const metadata = document.createElement("div");
-    metadata.className = "slot-meta";
     const source = document.createElement("span");
+    source.className = "source-label";
     source.dataset.sourceSummary = String(index);
-    const locationLabel = document.createElement("span");
-    locationLabel.textContent = getPanePositionLabel(index);
-    const pending = document.createElement("span");
-    pending.className = "pending-badge";
-    pending.dataset.pendingSlot = String(index);
-    pending.textContent = t("pendingSource");
-    metadata.append(source, locationLabel, pending);
-    heading.append(title, metadata);
+    heading.append(title);
 
     const dragHandle = document.createElement("button");
     dragHandle.className = "drag-handle";
@@ -595,7 +412,10 @@ function renderControls() {
     retryButton.type = "button";
     retryButton.className = "retry-button";
     retryButton.dataset.retrySlot = String(index);
-    playbackRow.append(status, retryButton);
+    const actions = document.createElement("div");
+    actions.className = "slot-actions";
+    actions.append(source, retryButton);
+    playbackRow.append(status, actions);
     wrapper.append(header, row, playbackRow);
     if (inactive) unusedList.append(wrapper);
     else slotControls.insertBefore(wrapper, slotControls.querySelector(".unused-sources"));
@@ -662,6 +482,7 @@ function updateSlotSourceSummary(index) {
   if (summary) {
     const label = getSourceLabel(getEditableSlot(index).url);
     summary.textContent = label;
+    summary.title = label;
     summary.dataset.platform = label.toLowerCase();
   }
 }
@@ -687,27 +508,26 @@ function updateSlotPlaybackStatus(index) {
     tile?.dataset.sourceUrl !== slot.url ? "sourcePending" : tile.dataset.status || "sourceLoading";
   status.textContent = t(pending && !slot.url ? "sourceRemoving" : key);
   const failed = ["sourceFailed", "sourceTimeout", "sourceOffline", "sourceRestricted", "sourceMediaError", "sourceRecoveryFailed", "sourceLoadUnconfirmed", "httpOnly", "enterCompleteUrl"].includes(key);
-  const loading = ["sourceResolving", "sourceLoading", "sourceBuffering", "sourceReconnecting", "sourceWaitingNetwork"].includes(key);
-  const tone = pending ? "pending" : failed ? "error" : loading ? "loading" : key === "sourcePlaying" ? "playing" : "neutral";
+  const tone = pending ? "pending" : sourceStatusTone(key);
   const container = slotControls.querySelector(`[data-status-container="${index}"]`);
   container.dataset.tone = tone;
   const icon = slotControls.querySelector(`[data-status-icon="${index}"]`);
-  icon.textContent = failed ? "!" : pending ? "○" : loading ? "" : key === "sourcePlaying" ? "▶" : key === "sourcePaused" ? "Ⅱ" : "·";
+  icon.textContent = tone === "error" ? "!" : pending ? "○" : tone === "loading" ? "" : key === "sourcePlaying" ? "▶" : key === "sourcePaused" ? "Ⅱ" : "·";
   const retry = slotControls.querySelector(`[data-retry-slot="${index}"]`);
   const localPlayer = isLocalLiveSource(parseUrl(slot.url));
   retry.hidden = localPlayer;
   retry.disabled = inactive || pending || !slot.url.trim();
   retry.textContent = t(localPlayer ? "refreshStream" : failed ? "retry" : "reload");
-  retry.classList.toggle("is-retry", failed);
+  retry.classList.toggle("is-retry", tone === "error");
   retry.title = pending ? t("applyFirst") : t(localPlayer ? "refreshStreamPane" : failed ? "retryPane" : "reloadPane", { number: index + 1 });
   retry.setAttribute("aria-label", retry.title);
-  slotControls.querySelector(`[data-pending-slot="${index}"]`).hidden = !pending;
   slotControls.querySelector(`[data-slot-target="${index}"]`).classList.toggle("has-draft", pending);
   slotControls.querySelector(`[data-clear-slot="${index}"]`).disabled = !slot.url;
 }
 
 function setTileStatus(tile, status) {
   tile.dataset.status = status;
+  syncTileFeedback(tile);
   updateSlotPlaybackStatus(Number(tile.dataset.tile));
 }
 
@@ -860,6 +680,7 @@ function retargetStageTile(tile, index) {
 
   tile.classList.add(`tile-${index + 1}`);
   tile.dataset.tile = String(index);
+  tile.dataset.paneLabel = t("pane", { number: index + 1 });
 
   const shell = tile.querySelector("[data-tile-frame-shell]");
   if (shell) {
@@ -913,6 +734,7 @@ async function renderStage() {
     }
     if (reuse && tile.querySelector(TILE_PLAYER_SELECTOR)) {
       updateSlotPlaybackStatus(index);
+      syncTileFeedback(tile);
       return;
     }
     if (reuse && tileLoads.has(tile)) {
@@ -934,9 +756,11 @@ async function renderStage() {
   // Each job installs its own result immediately; waiting here is only for
   // callers that explicitly need all current jobs to finish.
   await Promise.all(loads);
+  await ensureFrameHeaderRules();
 }
 
 function disposeTileLoad(tile) {
+  compatibilityFrames.delete(tile);
   disposeLiveRecovery(tile);
   const job = tileLoads.get(tile);
   tileLoads.delete(tile);
@@ -962,6 +786,10 @@ function loadTileSource(tile, sourceUrl, options = {}) {
         setTileStatus(tile, embed.errorKey || "sourceFailed");
         return;
       }
+      if (embed.compatibility) compatibilityFrames.set(tile, new URL(embed.src).origin);
+      else compatibilityFrames.delete(tile);
+      await ensureFrameHeaderRules();
+      if (tileLoads.get(tile) !== job || !tile.isConnected) return;
       const index = Number(tile.dataset.tile);
       tile.replaceChildren(createTileFrame(index, embed, sourceUrl));
       setTileStatus(tile, "sourceLoading");
@@ -1047,10 +875,10 @@ function createTileFrame(index, embed, sourceUrl) {
 }
 
 function showTileError(tile, sourceUrl, message) {
-  tile.replaceChildren(createErrorState(message));
+  tile.replaceChildren(createErrorState(message, sourceUrl));
 }
 
-function fallbackFromYouTubeEmbed(event) {
+async function fallbackFromYouTubeEmbed(event) {
   if (event.origin !== "https://www.youtube.com" && event.origin !== "https://www.youtube-nocookie.com") {
     return;
   }
@@ -1064,6 +892,10 @@ function fallbackFromYouTubeEmbed(event) {
   }
 
   delete iframe.dataset.fallbackSrc;
+  const tile = iframe.closest("[data-tile]");
+  compatibilityFrames.set(tile, new URL(fallbackSrc).origin);
+  await ensureFrameHeaderRules();
+  if (!iframe.isConnected) return;
   setTileStatus(iframe.closest("[data-tile]"), "sourceLoading");
   startFrameLoadTimer(iframe);
   iframe.src = fallbackSrc;
@@ -1129,10 +961,6 @@ async function refreshBilibiliFrameTitle(iframe) {
   }
 }
 
-function normalizePageTitle(value) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 300);
-}
-
 function requestFrameTitle(iframe) {
   if (iframe.dataset.livePlayer) { updateLiveContext(iframe); return; }
   iframe.contentWindow?.postMessage({
@@ -1149,13 +977,21 @@ function createEmptyState(index) {
   empty.className = "tile-empty";
   empty.innerHTML = `<span><strong>${escapeHtml(t("pane", { number: index + 1 }))}</strong>${escapeHtml(t("noSource"))}</span>`;
   empty.prepend(createLayoutPreview(state.layout, index));
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "add-source-button";
+  button.dataset.sourceAction = "edit";
+  button.textContent = t("addSource");
+  button.setAttribute("aria-label", t("editPane", { number: index + 1 }));
+  empty.append(button);
   return empty;
 }
 
-function createErrorState(message) {
+function createErrorState(message, sourceUrl) {
   const error = document.createElement("div");
   error.className = "tile-error";
   error.innerHTML = `<span><strong>${escapeHtml(t("cannotLoad"))}</strong>${escapeHtml(message)}</span>`;
+  error.append(createSourceActions(sourceUrl));
   return error;
 }
 
@@ -1165,9 +1001,8 @@ function syncStateFromForm() {
     const input = slotControls.querySelector(`[data-url-input="${index}"]`);
     const url = input ? input.value.trim() : getEditableSlot(index).url;
     return {
-      url,
-      title: url === state.slots[index].url ? state.slots[index].title : "",
-      quality: url === state.slots[index].url ? state.slots[index].quality : "auto"
+      ...(url === state.slots[index].url ? state.slots[index] : {}),
+      url
     };
   });
 
@@ -1178,20 +1013,33 @@ function syncStateFromForm() {
   draftUrls = null;
 }
 
-function openControls() {
+function openControls(index = null) {
   if (controlOverlay.hidden) focusBeforeControls = document.activeElement;
+  if (Number.isInteger(index) && index >= 0 && index < SLOT_COUNT) {
+    if (index >= state.layout) unusedSourcesExpanded = true;
+  }
   renderControls();
   controlOverlay.hidden = false;
+  document.querySelector("#viewTools").hidden = true;
+  document.querySelector("#openControlsButton").setAttribute("aria-expanded", "true");
   appShell.inert = true;
-  const firstInput = slotControls.querySelector("input");
   window.setTimeout(() => {
     requestFrameTitles();
-    if (!controlOverlay.hidden) firstInput?.focus();
+    if (controlOverlay.hidden) return;
+    const target = Number.isInteger(index) ? slotControls.querySelector(`[data-url-input="${index}"]`) :
+      Array.from(slotControls.querySelectorAll("[data-url-input]")).find((element) =>
+        element.getClientRects().length && !element.closest("[hidden], details:not([open])"));
+    target?.focus();
   }, 0);
 }
 
 function closeControls() {
   controlOverlay.hidden = true;
+  clearSourceMenuNotice();
+  clearPaneHighlight();
+  document.querySelector("#viewTools").hidden = false;
+  document.querySelector("#openControlsButton").setAttribute("aria-expanded", "false");
+  showViewTools();
   appShell.inert = false;
   document.body.tabIndex = -1;
   const target = focusBeforeControls?.isConnected && !controlOverlay.contains(focusBeforeControls)
@@ -1283,7 +1131,12 @@ function syncFullscreenState() {
 
   fullscreenButton.title = isFullscreen ? t("exitLayoutFullscreen") : t("layoutFullscreen");
   fullscreenButton.setAttribute("aria-label", fullscreenButton.title);
-  fullscreenButton.innerHTML = isFullscreen ? ICONS.minimize : ICONS.maximize;
+  document.querySelector("#fullscreenIcon").innerHTML = isFullscreen ? ICONS.minimize : ICONS.maximize;
+  document.querySelector("#fullscreenLabel").textContent = fullscreenButton.title;
+  const viewingButton = document.querySelector("#viewFullscreenButton");
+  viewingButton.innerHTML = isFullscreen ? ICONS.minimize : ICONS.maximize;
+  viewingButton.title = fullscreenButton.title;
+  viewingButton.setAttribute("aria-label", fullscreenButton.title);
 
   syncViewportState();
 }
@@ -1307,12 +1160,21 @@ function createSplitter(axis) {
   splitter.className = `splitter splitter-${axis}`;
   splitter.type = "button";
   splitter.dataset.splitter = axis;
-  splitter.title = axis === "col" ? t("dragWidth") : t("dragHeight");
+  splitter.title = `${axis === "col" ? t("dragWidth") : t("dragHeight")} · ${t("resetSplitHint")}`;
   splitter.setAttribute("aria-label", splitter.title);
   splitter.setAttribute("aria-orientation", axis === "col" ? "vertical" : "horizontal");
   splitter.setAttribute("role", "separator");
   splitter.setAttribute("aria-valuemin", "18");
   splitter.setAttribute("aria-valuemax", "82");
+  const feedback = document.createElement("span");
+  feedback.className = "splitter-feedback";
+  feedback.setAttribute("aria-hidden", "true");
+  const ratio = document.createElement("strong");
+  ratio.dataset.splitRatio = "";
+  const hint = document.createElement("small");
+  hint.textContent = t("resetSplitHint");
+  feedback.append(ratio, hint);
+  splitter.append(feedback);
   return splitter;
 }
 
@@ -1345,6 +1207,7 @@ function startResize(event) {
   const rect = stage.getBoundingClientRect();
 
   document.body.classList.add("is-resizing");
+  splitter.classList.add("is-dragging");
   splitter.setPointerCapture?.(event.pointerId);
 
   let resizeFrame = 0;
@@ -1378,6 +1241,7 @@ function startResize(event) {
     }
 
     document.body.classList.remove("is-resizing");
+    splitter.classList.remove("is-dragging");
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onEnd);
     window.removeEventListener("pointercancel", onEnd);
@@ -1415,7 +1279,9 @@ function applyStageSizing(axis, notifyFrames = true) {
   stage.querySelectorAll("[data-splitter]").forEach((splitter) => {
     const value = sizes[splitter.dataset.splitter];
     splitter.setAttribute("aria-valuenow", String(value));
-    splitter.setAttribute("aria-valuetext", `${value}%`);
+    const ratio = `${value}% / ${roundPercent(100 - value)}%`;
+    splitter.setAttribute("aria-valuetext", ratio);
+    splitter.querySelector("[data-split-ratio]").textContent = ratio;
   });
 
   if (notifyFrames) {
@@ -1473,540 +1339,6 @@ function flushTileFrameViewportChange() {
   });
 }
 
-async function resolveEmbed(rawUrl, signal) {
-  const parsed = parseUrl(rawUrl);
-  if (!parsed) {
-    return { ok: false, errorKey: "enterCompleteUrl", message: t("enterCompleteUrl") };
-  }
-
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return { ok: false, errorKey: "httpOnly", message: t("httpOnly") };
-  }
-
-  const youtubeEmbed = getYouTubeEmbedUrl(parsed);
-  if (youtubeEmbed) {
-    return {
-      ok: true,
-      src: youtubeEmbed,
-      fallbackSrc: parsed.href,
-      referrerPolicy: "strict-origin-when-cross-origin"
-    };
-  }
-
-  const bilibiliLivePlayer = await getBilibiliLivePlayerUrl(parsed);
-  if (bilibiliLivePlayer) {
-    return {
-      ok: true,
-      src: bilibiliLivePlayer,
-      bilibiliRoomId: new URL(bilibiliLivePlayer).searchParams.get("cid"),
-      referrerPolicy: "no-referrer-when-downgrade"
-    };
-  }
-
-  const twitchChannel = getTwitchLiveChannel(parsed);
-  if (twitchChannel) {
-    const stream = await fetchTwitchLiveStream(twitchChannel, signal);
-    return {
-      ok: true,
-      src: stream.url,
-      title: stream.title,
-      livePlayer: true,
-      autoplay: parsed.searchParams.get("autoplay") !== "false",
-      muted: parsed.searchParams.get("muted") !== "false"
-    };
-  }
-
-  const huyaLivePlayer = getHuyaLivePlayerUrl(parsed);
-  if (huyaLivePlayer) {
-    return {
-      ok: true,
-      src: huyaLivePlayer,
-      referrerPolicy: "strict-origin-when-cross-origin"
-    };
-  }
-
-  const kickChannel = getKickLiveChannel(parsed);
-  if (kickChannel) {
-    const stream = await fetchKickLiveStream(kickChannel, signal);
-    return {
-      ok: true,
-      src: stream.url,
-      title: stream.title,
-      livePlayer: true,
-      autoplay: parsed.searchParams.get("autoplay") !== "false",
-      muted: parsed.searchParams.get("muted") !== "false"
-    };
-  }
-
-  const soopLivePlayer = getSoopLivePlayerUrl(parsed);
-  if (soopLivePlayer) {
-    return {
-      ok: true,
-      src: soopLivePlayer,
-      referrerPolicy: "strict-origin-when-cross-origin"
-    };
-  }
-
-  if (isYesLiveHost(parsed.hostname.toLowerCase())) {
-    return {
-      ok: true,
-      src: parsed.href,
-      fixedViewport: YESLIVE_THEATER_VIEWPORT,
-      referrerPolicy: "strict-origin-when-cross-origin"
-    };
-  }
-
-  return {
-    ok: true,
-    src: parsed.href,
-    referrerPolicy: "strict-origin-when-cross-origin"
-  };
-}
-
-function getYouTubeEmbedUrl(url) {
-  const hostname = url.hostname.toLowerCase();
-  if (!isYouTubeHost(hostname)) {
-    return "";
-  }
-
-  const videoId = getYouTubeVideoId(url);
-  const playlistId = url.searchParams.get("list") || (url.pathname === "/playlist" ? url.searchParams.get("list") : "");
-  if (!videoId && !playlistId) {
-    return "";
-  }
-
-  const embedUrl = new URL(
-    videoId ? `https://www.youtube.com/embed/${encodeURIComponent(videoId)}` : "https://www.youtube.com/embed/videoseries"
-  );
-  embedUrl.searchParams.set("autoplay", "1");
-  embedUrl.searchParams.set("playsinline", "1");
-  embedUrl.searchParams.set("rel", "0");
-  embedUrl.searchParams.set("origin", location.origin);
-  embedUrl.searchParams.set("widget_referrer", location.href);
-
-  if (playlistId) {
-    embedUrl.searchParams.set("list", playlistId);
-  }
-
-  copyYouTubeParam(url, embedUrl, "index");
-  copyYouTubeParam(url, embedUrl, "loop");
-  copyYouTubeParam(url, embedUrl, "si");
-
-  const startSeconds = getYouTubeStartSeconds(url);
-  if (startSeconds > 0) {
-    embedUrl.searchParams.set("start", String(startSeconds));
-  }
-
-  return embedUrl.href;
-}
-
-function getYouTubeVideoId(url) {
-  const hostname = url.hostname.toLowerCase();
-  if (hostname === "youtu.be") {
-    return sanitizeYouTubeId(url.pathname.split("/").filter(Boolean)[0]);
-  }
-
-  const queryVideoId = sanitizeYouTubeId(url.searchParams.get("v"));
-  if (queryVideoId) {
-    return queryVideoId;
-  }
-
-  const pathParts = url.pathname.split("/").filter(Boolean);
-  if (["embed", "live", "shorts", "v"].includes(pathParts[0])) {
-    return sanitizeYouTubeId(pathParts[1]);
-  }
-
-  return "";
-}
-
-function sanitizeYouTubeId(value) {
-  const normalized = String(value || "").trim();
-  return /^[A-Za-z0-9_-]{6,64}$/.test(normalized) ? normalized : "";
-}
-
-function copyYouTubeParam(source, destination, name) {
-  const value = source.searchParams.get(name);
-  if (value) {
-    destination.searchParams.set(name, value);
-  }
-}
-
-function getYouTubeStartSeconds(url) {
-  const value = url.searchParams.get("start") || url.searchParams.get("t") || "";
-  if (/^\d+$/.test(value)) {
-    return Number(value);
-  }
-
-  const match = value.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
-  if (!match || !match[0]) {
-    return 0;
-  }
-
-  return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
-}
-
-function getSourceLabel(rawUrl) {
-  if (!rawUrl.trim()) return "";
-
-  const parsed = parseUrl(rawUrl);
-  if (!parsed) return "URL";
-
-  const hostname = parsed.hostname.toLowerCase();
-  if (isYouTubeHost(hostname)) return "YouTube";
-  if (isTwitchHost(hostname)) return "Twitch";
-  if (isBilibiliHost(hostname)) return "Bilibili";
-  if (isYesLiveHost(hostname)) return "YesLive";
-  if (isHuyaHost(hostname)) return "Huya";
-  if (isKickHost(hostname)) return "Kick";
-  if (isSoopHost(hostname)) return "SOOP";
-  if (isDirectMediaUrl(parsed)) return getMediaLabel(parsed);
-  return hostname || "URL";
-}
-
-function getMediaLabel(url) {
-  const extension = getPathExtension(url);
-  return extension ? `${t("video")} .${extension}` : t("video");
-}
-
-function parseUrl(rawUrl) {
-  const value = rawUrl.trim();
-  if (!value) return null;
-
-  try {
-    return new URL(value);
-  } catch {
-    try {
-      return new URL(`https://${value}`);
-    } catch {
-      return null;
-    }
-  }
-}
-
-async function getBilibiliLivePlayerUrl(url) {
-  if (!isBilibiliHost(url.hostname.toLowerCase())) {
-    return "";
-  }
-
-  const roomId = getBilibiliLiveRoomId(url);
-  if (!roomId) {
-    return "";
-  }
-
-  const resolvedRoomId = await resolveBilibiliLiveRoomId(roomId);
-  if (!resolvedRoomId) {
-    return "";
-  }
-
-  const playerUrl = new URL("https://www.bilibili.com/blackboard/live/live-activity-player.html");
-  playerUrl.searchParams.set("cid", resolvedRoomId);
-  playerUrl.searchParams.set("mute", "1");
-  playerUrl.searchParams.set("danmaku", "1");
-  playerUrl.searchParams.set("fullscreen", "1");
-  playerUrl.searchParams.set("quality", "1");
-  playerUrl.searchParams.set("sendpanel", "0");
-  playerUrl.searchParams.set("recommend", "0");
-  playerUrl.searchParams.set("logo", "0");
-  playerUrl.searchParams.set("enableAutoPlayTips", "0");
-  return playerUrl.href;
-}
-
-async function resolveBilibiliLiveRoomId(roomId) {
-  if (!isNumericId(roomId)) {
-    return "";
-  }
-
-  if (bilibiliRoomIdCache.has(roomId)) {
-    return bilibiliRoomIdCache.get(roomId);
-  }
-
-  const request = fetchBilibiliLiveRoomId(roomId);
-  bilibiliRoomIdCache.set(roomId, request);
-  try {
-    return await request;
-  } catch (error) {
-    // Do not let an older failed request remove a newer retry's cache entry.
-    if (bilibiliRoomIdCache.get(roomId) === request) bilibiliRoomIdCache.delete(roomId);
-    throw error;
-  }
-}
-
-async function fetchBilibiliLiveRoomId(roomId) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
-  try {
-    const apiUrl = new URL(BILIBILI_ROOM_INIT_ENDPOINT);
-    apiUrl.searchParams.set("id", roomId);
-
-    const response = await fetch(apiUrl.href, {
-      credentials: "omit",
-      cache: "no-store",
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      throw new Error("Room lookup failed.");
-    }
-
-    const payload = await response.json();
-    const resolvedRoomId = payload?.data?.room_id;
-    if ((payload.code !== undefined && payload.code !== 0) || !isNumericId(resolvedRoomId) || Number(resolvedRoomId) <= 0) {
-      throw new Error("Invalid room lookup response.");
-    }
-    return String(resolvedRoomId);
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw Object.assign(new Error("Room lookup timed out."), { code: "sourceTimeout" });
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
-
-async function fetchBilibiliLiveTitle(roomId) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
-  try {
-    const apiUrl = new URL(BILIBILI_ROOM_INFO_ENDPOINT);
-    apiUrl.searchParams.set("room_id", roomId);
-    const response = await fetch(apiUrl.href, {
-      credentials: "omit",
-      cache: "no-store",
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error("Room title lookup failed.");
-    const payload = await response.json();
-    const title = typeof payload?.data?.title === "string" ? normalizePageTitle(payload.data.title) : "";
-    if (payload.code !== 0 || String(payload?.data?.room_id) !== roomId || !title) {
-      throw new Error("Invalid room title response.");
-    }
-    return title;
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
-
-function getBilibiliLiveRoomId(url) {
-  const fromQuery = url.searchParams.get("roomId") || url.searchParams.get("room_id") || url.searchParams.get("cid");
-  if (isNumericId(fromQuery)) {
-    return fromQuery;
-  }
-
-  if (url.hostname.toLowerCase() !== "live.bilibili.com") {
-    return "";
-  }
-
-  const [firstPathPart] = url.pathname.split("/").filter(Boolean);
-  return isNumericId(firstPathPart) ? firstPathPart : "";
-}
-
-function isNumericId(value) {
-  return /^\d+$/.test(String(value || ""));
-}
-
-function isDirectMediaUrl(url) {
-  return /^(mp4|m4v|webm|ogv|ogg|mov|m3u8|mpd)$/i.test(getPathExtension(url));
-}
-
-function getPathExtension(url) {
-  let path = url.pathname || "";
-  try {
-    path = decodeURIComponent(path);
-  } catch {
-    // A URL can contain a literal '%' or incomplete UTF-8 escape sequence.
-    // Labels must never prevent the remaining sources from loading.
-  }
-  path = path.toLowerCase();
-  const match = path.match(/\.([a-z0-9]+)$/);
-  return match ? match[1] : "";
-}
-
-function isYouTubeHost(hostname) {
-  return hostname === "youtu.be" || hostname === "youtube.com" || hostname.endsWith(".youtube.com") || hostname.endsWith(".youtube-nocookie.com");
-}
-
-function isTwitchHost(hostname) {
-  return hostname === "twitch.tv" || hostname.endsWith(".twitch.tv") || hostname === "player.twitch.tv";
-}
-
-function isKickHost(hostname) {
-  return hostname === "kick.com" || hostname.endsWith(".kick.com");
-}
-
-function isLocalLiveSource(url) {
-  return Boolean(getKickLiveChannel(url) || getTwitchLiveChannel(url));
-}
-
-function getKickLiveChannel(url) {
-  if (!url || !["kick.com", "www.kick.com"].includes(url.hostname.toLowerCase())) return "";
-  // Clips can use a channel URL with a clip query; keep those and VOD routes.
-  if (url.searchParams.has("clip")) return "";
-  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)\/?$/);
-  const reserved = [
-    "about", "advertise", "auth", "browse", "categories", "category", "clips",
-    "community-guidelines", "dashboard", "dmca-policy", "download", "downloads",
-    "following", "forgot-password", "login", "logout", "privacy-policy", "safety",
-    "search", "security", "settings", "signup", "subscriptions", "terms-of-service"
-  ];
-  if (!match || reserved.includes(match[1].toLowerCase())) return "";
-  return match[1].toLowerCase();
-}
-
-async function fetchKickLiveStream(channel, signal) {
-  const controller = new AbortController();
-  const cancel = () => controller.abort();
-  if (signal?.aborted) cancel();
-  else signal?.addEventListener("abort", cancel, { once: true });
-  const timer = window.setTimeout(() => controller.abort(), SOURCE_RESOLVE_TIMEOUT_MS);
-  try {
-    const apiUrl = new URL(`https://kick.com/api/v2/channels/${encodeURIComponent(channel)}`);
-    // Also avoid an intermediary serving a previously cached channel response.
-    apiUrl.searchParams.set("_", String(Date.now()));
-    const response = await fetch(apiUrl.href, {
-      credentials: "omit",
-      cache: "no-store",
-      signal: controller.signal
-    });
-    if (response.status === 401 || response.status === 403) {
-      throw Object.assign(new Error("Kick playback is restricted."), { code: "sourceRestricted" });
-    }
-    if (response.status === 404) throw Object.assign(new Error("Kick channel is offline."), { code: "sourceOffline" });
-    if (!response.ok) throw Object.assign(new Error("Kick channel lookup failed."), {
-      retryAfterMs: response.status === 429 ? 30000 : 0
-    });
-    const payload = await response.json();
-    if (payload?.livestream === null || payload?.livestream?.is_live === false) {
-      throw Object.assign(new Error("Kick channel is offline."), { code: "sourceOffline" });
-    }
-    if (!payload?.livestream || typeof payload.playback_url !== "string") {
-      throw new Error("Invalid Kick channel response.");
-    }
-    const streamUrl = new URL(payload.playback_url);
-    if (streamUrl.protocol !== "https:" || streamUrl.username || streamUrl.password || getPathExtension(streamUrl) !== "m3u8") {
-      throw new Error("Invalid Kick stream URL.");
-    }
-    return {
-      url: streamUrl.href,
-      title: normalizePageTitle(payload.livestream.session_title) || `Kick · ${channel}`
-    };
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw Object.assign(new Error("Kick channel lookup timed out."), { code: "sourceTimeout" });
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timer);
-    signal?.removeEventListener("abort", cancel);
-  }
-}
-
-function isSoopHost(hostname) {
-  return ["sooplive.com", "sooplive.co.kr", "afreecatv.com"].some(
-    (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
-  );
-}
-
-function getSoopLivePlayerUrl(url) {
-  if (!["play.sooplive.com", "play.sooplive.co.kr", "play.afreecatv.com"].includes(url.hostname.toLowerCase())) return "";
-  // SOOP publishes /<channel>[/<broadcast number>]/embed as the live player.
-  // Keep the broadcast number, and leave VOD, chat and existing embeds alone.
-  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)(?:\/(\d+))?\/?$/);
-  if (!match) return "";
-  return `https://play.sooplive.com/${match[1]}${match[2] ? `/${match[2]}` : ""}/embed`;
-}
-
-function isBilibiliHost(hostname) {
-  return hostname === "bilibili.com" || hostname.endsWith(".bilibili.com");
-}
-
-function isYesLiveHost(hostname) {
-  return hostname === "yes2049.com" || hostname.endsWith(".yes2049.com") || hostname === "yeslivetv.com" || hostname.endsWith(".yeslivetv.com") || hostname === "welife6.com" || hostname.endsWith(".welife6.com");
-}
-
-function isHuyaHost(hostname) {
-  return hostname === "huya.com" || hostname.endsWith(".huya.com");
-}
-
-function getHuyaLivePlayerUrl(url) {
-  // Only room pages use the stand-alone player. Keep categories, videos,
-  // existing embeds, and other Huya services at their original URLs.
-  if (!["huya.com", "www.huya.com", "m.huya.com"].includes(url.hostname.toLowerCase())) {
-    return "";
-  }
-
-  const match = url.pathname.match(/^\/([a-zA-Z0-9]+)\/?$/);
-  if (!match || ["g", "l", "u", "search", "download", "index", "replay"].includes(match[1].toLowerCase())) {
-    return "";
-  }
-
-  // Huya's player resolves both numeric room IDs and private-host aliases.
-  return `https://liveshare.huya.com/iframe/${match[1]}`;
-}
-
-async function readState() {
-  if (globalThis.chrome?.storage?.local) {
-    const result = await chrome.storage.local.get([STORAGE_KEY, PREVIOUS_STORAGE_KEY, LEGACY_STORAGE_KEY]);
-    return result[STORAGE_KEY] || result[PREVIOUS_STORAGE_KEY] || result[LEGACY_STORAGE_KEY];
-  }
-
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY)) || JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY));
-  } catch {
-    return null;
-  }
-}
-
-async function persistState(message) {
-  window.clearTimeout(saveTimer);
-  saveStatus.textContent = message;
-
-  if (globalThis.chrome?.storage?.local) {
-    await chrome.storage.local.set({ [STORAGE_KEY]: state });
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
-  saveTimer = window.setTimeout(() => {
-    saveStatus.textContent = "";
-  }, 1300);
-}
-
-function normalizeState(input) {
-  const language = normalizeLanguage(input?.language);
-  const layout = [2, 3, 4].includes(Number(input?.layout)) ? Number(input.layout) : DEFAULT_STATE.layout;
-  const sourceSlots = Array.isArray(input?.slots) ? input.slots : DEFAULT_STATE.slots;
-  const slots = Array.from({ length: SLOT_COUNT }, (_, index) => ({
-    url: String(sourceSlots[index]?.url || ""),
-    title: normalizePageTitle(sourceSlots[index]?.title),
-    quality: /^(auto|[1-9]\d{1,4}p(?:[1-9]\d{0,2})?)$/.test(sourceSlots[index]?.quality)
-      ? sourceSlots[index].quality : "auto"
-  }));
-
-  return {
-    language,
-    layout,
-    slots,
-    sizes: normalizeSizes(input?.sizes)
-  };
-}
-
-function normalizeLanguage(language) {
-  if (SUPPORTED_LANGUAGES.includes(language)) {
-    return language;
-  }
-
-  return navigator.language?.toLowerCase().startsWith("zh") ? "zh-TW" : DEFAULT_STATE.language;
-}
-
-function t(key, replacements = {}) {
-  const dictionary = TRANSLATIONS[state.language] || TRANSLATIONS.en;
-  const template = dictionary[key] || TRANSLATIONS.en[key] || key;
-  return Object.entries(replacements).reduce(
-    (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
-    template
-  );
-}
-
 function applyLanguage() {
   document.documentElement.lang = state.language === "zh-TW" ? "zh-Hant" : "en";
   controlsSubtitle.textContent = t("sourcesAndLayout");
@@ -2020,32 +1352,13 @@ function applyLanguage() {
   closeControlsButton.title = t("close");
   closeControlsButton.setAttribute("aria-label", t("close"));
   maximizeLayoutLabel.textContent = t("maximizeLayout");
+  maximizeLayoutButton.title = t("fitWindowHint");
+  document.querySelector("#viewTools").setAttribute("aria-label", t("viewingControls"));
+  document.querySelector("#openControlsLabel").textContent = t("sourcesAndLayout");
   document.querySelector(".layout-switch").setAttribute("aria-label", t("paneCount"));
   syncFullscreenState();
   updatePlaybackNotice();
-}
-
-function normalizeSizes(input) {
-  const sizes = structuredClone(DEFAULT_STATE.sizes);
-
-  for (const layoutKey of Object.keys(sizes)) {
-    for (const axis of Object.keys(sizes[layoutKey])) {
-      const value = Number(input?.[layoutKey]?.[axis]);
-      if (Number.isFinite(value)) {
-        sizes[layoutKey][axis] = clamp(value, 18, 82);
-      }
-    }
-  }
-
-  return sizes;
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function roundPercent(value) {
-  return Math.round(value * 10) / 10;
+  renderSourceMenuNotice();
 }
 
 function escapeHtml(value) {

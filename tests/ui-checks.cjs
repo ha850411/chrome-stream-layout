@@ -7,6 +7,7 @@ module.exports = async function checkSourceControls(page) {
   const originalUrls = ["first", "second", "third", "fourth"].map((name) => `https://fixture.example/${name}`);
   const draftUrl = "https://fixture.example/draft";
   const input = (index) => page.locator(`[data-url-input="${index}"]`);
+  const fill = (index, value) => input(index).fill(value);
   const frame = (index) => page.locator(`[data-tile="${index}"] iframe`);
   const readSaved = () => page.evaluate(async () => (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY]);
   const waitForSaved = (predicate, value) => page.waitForFunction(predicate, value);
@@ -24,6 +25,9 @@ module.exports = async function checkSourceControls(page) {
     window.originalFrames = [0, 1].map((index) => document.querySelector(`[data-tile="${index}"] iframe`));
   }, originalUrls);
   await page.waitForFunction(() => [0, 1].every((index) => document.querySelector(`[data-tile="${index}"]`).dataset.status === "sourcePageLoaded"));
+  assert.equal(await input(0).isVisible(), true);
+  assert.equal(await input(1).isVisible(), true);
+  assert.equal(await page.locator("[data-edit-slot], #presetsPanel, .compatibility-option").count(), 0);
   assert.equal(await page.locator(".unused-sources").getAttribute("open"), null);
   assert.equal(await input(2).isVisible(), false);
   assert.equal(await input(2).inputValue(), originalUrls[2]);
@@ -43,7 +47,7 @@ module.exports = async function checkSourceControls(page) {
   await transfer.dispose();
   console.log("PASS: layout previews, collapsed retained sources, handle-only drag and hidden focus targets");
 
-  await input(0).fill(draftUrl);
+  await fill(0, draftUrl);
   assert.equal(await page.locator("#applyButton").textContent(), "Apply (1)");
   assert.equal(await page.locator('[data-status-container="0"]').getAttribute("data-tone"), "pending");
   assert.equal(await page.locator('[data-retry-slot="0"]').isDisabled(), true);
@@ -76,7 +80,7 @@ module.exports = async function checkSourceControls(page) {
   console.log("PASS: language, layout, reload and dialog closing retain drafts; only Apply commits source changes");
 
   await page.evaluate(() => openControls());
-  await input(1).fill("https://fixture.example/discard-me");
+  await fill(1, "https://fixture.example/discard-me");
   await page.locator("#discardButton").click();
   assert.equal(await input(1).inputValue(), originalUrls[1]);
   assert.equal(await page.locator("#draftNotice").isVisible(), false);
@@ -86,7 +90,7 @@ module.exports = async function checkSourceControls(page) {
   assert.equal(await page.locator('[data-playback-status="1"]').textContent(), "Apply to remove this source");
   assert.equal(await page.evaluate(() => unchangedFrame.isConnected), true);
   await page.locator("#discardButton").click();
-  await input(1).fill("https://fixture.example/preserved-draft");
+  await fill(1, "https://fixture.example/preserved-draft");
   await page.locator("#clearButton").click();
   await page.waitForFunction(() => !document.querySelector("#stage iframe"));
   assert.equal(await page.locator("#undoNotice").isVisible(), true);
@@ -142,7 +146,7 @@ module.exports = async function checkSourceControls(page) {
   console.log("PASS: status text, icons and colors distinguish failure and playback, with contextual retry");
 
   // Apply also saves pending changes inside a collapsed unused section.
-  await input(3).fill("https://fixture.example/unused-draft");
+  await fill(3, "https://fixture.example/unused-draft");
   await page.locator(".unused-sources > summary").click();
   await page.locator("#applyButton").click();
   await waitForSaved(async () => (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY]?.slots[3].url === "https://fixture.example/unused-draft");
@@ -151,7 +155,7 @@ module.exports = async function checkSourceControls(page) {
   console.log("PASS: applying a collapsed source saves its URL without loading an unused pane");
 
   await page.locator('[data-layout="4"]').click();
-  await input(0).fill("https://fixture.example/responsive-draft");
+  await fill(0, "https://fixture.example/responsive-draft");
   for (const viewport of [{ width: 1366, height: 768 }, { width: 900, height: 600 }, { width: 390, height: 844 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport);
     assert.equal(await page.locator(".control-dialog").evaluate((element) => {

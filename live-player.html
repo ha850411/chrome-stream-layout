@@ -9,24 +9,69 @@
 <body>
   <main id="player" tabindex="0">
     <video id="video" playsinline></video>
-    <p id="message" role="status"></p>
-    <span id="platform" class="platform-badge"></span>
-    <div id="controls" class="player-toolbar" role="group" aria-label="播放控制">
+    <div class="player-shade" aria-hidden="true"></div>
+    <div class="player-feedback">
+      <div class="player-feedback-card glass-surface">
+        <div class="feedback-mascot" aria-hidden="true">
+          <svg class="mascot-face" viewBox="0 0 40 40" width="36" height="36">
+            <path class="cat-ear ear-left" d="M8 13 L14 4 L18 13 Z" fill="#c4b5fd" />
+            <path class="cat-ear ear-right" d="M32 13 L26 4 L22 13 Z" fill="#c4b5fd" />
+            <rect class="cat-screen" x="6" y="11" width="28" height="23" rx="8" fill="#1e183a" stroke="#a78bfa" stroke-width="2"/>
+            <g class="eyes-loading">
+              <ellipse cx="15" cy="22" rx="2.5" ry="3" fill="#ffffff"/>
+              <ellipse cx="25" cy="22" rx="2.5" ry="3" fill="#ffffff"/>
+              <circle cx="16" cy="21" r="1" fill="#c4b5fd"/>
+              <circle cx="26" cy="21" r="1" fill="#c4b5fd"/>
+              <path d="M19 25 Q20 26.5 21 25" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </g>
+            <g class="eyes-sleeping">
+              <path d="M13 22 Q15 25 17 22" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <path d="M23 22 Q25 25 27 22" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <circle cx="11" cy="24" r="2" fill="#f472b6" opacity="0.6"/>
+              <circle cx="29" cy="24" r="2" fill="#f472b6" opacity="0.6"/>
+            </g>
+          </svg>
+        </div>
+        <p id="message" role="status"></p>
+        <div id="errorActions" class="error-actions" hidden>
+          <button id="retrySource" type="button">重試</button>
+          <button id="editSource" type="button">編輯來源</button>
+          <a id="openSource" target="_blank" rel="noopener noreferrer">原站開啟</a>
+        </div>
+      </div>
+    </div>
+    <span id="platform" class="platform-badge glass-surface"></span>
+    <button id="centerPlay" class="center-play-button glass-surface" type="button" data-state="paused" disabled hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="play-symbol" d="M8 5.5c0-.8.9-1.3 1.6-.9l9.5 6.5a1.1 1.1 0 0 1 0 1.8l-9.5 6.5A1.1 1.1 0 0 1 8 18.5Z"/>
+        <g class="pause-symbol"><rect x="7" y="5" width="3" height="14" rx="1"/><rect x="14" y="5" width="3" height="14" rx="1"/></g>
+      </svg>
+    </button>
+    <div id="controls" class="player-toolbar glass-surface" role="group" aria-label="播放控制">
       <button id="play" type="button" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="m8 5 11 7-11 7Z"/></svg>
       </button>
-      <div class="volume-control">
-        <button id="mute" type="button" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/><path id="soundIcon" d="m17 9 5 6m0-6-5 6"/></svg>
-        </button>
-        <input id="volume" type="range" min="0" max="1" step="0.05" value="1" disabled>
-      </div>
+      <button id="mute" type="button" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/><path id="soundIcon" d="m17 9 5 6m0-6-5 6"/></svg>
+      </button>
       <button id="live" class="live-button" type="button" disabled><span class="live-dot" aria-hidden="true"></span>LIVE</button>
-      <select id="quality" disabled><option value="auto">自動</option></select>
-      <button id="fullscreen" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/></svg>
+      <div id="playerOptions" class="player-options glass-surface">
+        <label class="volume-option"><span id="volumeLabel">音量</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1" disabled><span class="audio-wave" aria-hidden="true"><span class="bar bar-1"></span><span class="bar bar-2"></span><span class="bar bar-3"></span></span></label>
+        <div class="quality-option">
+          <span id="qualityLabel">畫質</span>
+          <button id="quality" type="button" value="auto" aria-haspopup="menu" aria-expanded="false" aria-controls="qualityMenu" disabled>
+            <span id="qualityValue">自動</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+          </button>
+        </div>
+        <button id="fullscreen" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/></svg><span id="fullscreenLabel">全螢幕</span>
+        </button>
+      </div>
+      <button id="more" class="more-button" type="button" aria-expanded="false" aria-controls="playerOptions" aria-label="更多播放設定">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
       </button>
     </div>
+    <div id="qualityMenu" class="quality-menu glass-surface" role="menu" aria-labelledby="qualityLabel" hidden></div>
   </main>
   <script src="src/vendor/ivs/amazon-ivs-player.min.js"></script>
   <script src="src/live-engine.js"></script>

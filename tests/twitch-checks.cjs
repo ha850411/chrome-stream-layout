@@ -28,7 +28,7 @@ module.exports = async function checkTwitch(page) {
   await page.route(kick, (route) => route.fulfill({ json: { livestream: { session_title: "Kick fixture" }, playback_url: "https://fixture.example/kick.m3u8" } }));
   const waitStatus = (status, index = 0) => page.waitForFunction(({ status, index }) => document.querySelector(`[data-tile="${index}"]`).dataset.status === status, { status, index });
   const player = () => page.frameLocator('[data-tile="0"] iframe[data-live-player]');
-  const reveal = () => player().locator("#video").hover({ position: { x: 20, y: 20 } });
+  const reveal = () => player().locator("#player").hover({ position: { x: 20, y: 20 } });
   const waitSource = (number) => page.waitForFunction((number) => {
     const url = document.querySelector('[data-tile="0"] iframe')?.contentWindow.ivsFixture?.urls.at(-1);
     return url && JSON.parse(new URL(url).searchParams.get("token")).revision === number;
@@ -65,16 +65,25 @@ module.exports = async function checkTwitch(page) {
     assert.equal(await player().locator("#player").getAttribute("aria-label"), "Pane 1");
     assert.equal(await page.evaluate(() => typeof IVSPlayer), "undefined");
     assert.deepEqual(await player().locator("#video").evaluate((v) => [v.controls, v.muted]), [false, true]);
-    await reveal(); await player().locator("#quality").selectOption("1080p60");
+    await reveal(); await player().locator("#quality").click();
+    await player().getByRole("menuitemradio", { name: "1080p60", exact: true }).click();
     await player().locator("#mute").click(); await player().locator("#volume").fill("0.35");
     await live();
     assert.equal(await page.evaluate(() => originalTwitch === document.querySelector('[data-tile="0"] iframe') && originalKick.isConnected), true);
     assert.equal(await player().locator("body").evaluate(() => ivsFixture.instances.length), 1);
     assert.deepEqual(await player().locator("#video").evaluate((v) => [v.volume, v.muted]), [0.35, false]);
-    assert.equal(await player().locator("#quality").inputValue(), "1080p60");
-    await reveal(); await player().locator("#play").click(); await waitStatus("sourcePaused");
+    assert.equal(await player().locator("#quality").getAttribute("value"), "1080p60");
+    await player().locator("#video").click({ position: { x: 80, y: 80 } });
+    assert.equal(await player().locator("#video").evaluate(v => v.paused), false);
+    await reveal(); await player().locator("#centerPlay").click(); await waitStatus("sourcePaused");
+    assert.equal(await player().locator("#play").getAttribute("aria-label"), "Play live");
+    assert.equal(await player().locator("#centerPlay").getAttribute("aria-label"), "Play live");
+    await player().locator("#video").click({ position: { x: 80, y: 80 } });
+    assert.equal(await player().locator("#video").evaluate(v => v.paused), true);
     const resumed = revision + 1;
     await player().locator("#play").click(); await waitSource(resumed); await waitStatus("sourcePlaying");
+    assert.equal(await player().locator("#play").getAttribute("aria-label"), "Pause");
+    assert.equal(await player().locator("#centerPlay").getAttribute("aria-label"), "Pause");
     const storage = await page.evaluate(async () => JSON.stringify(await chrome.storage.local.get(null)));
     assert.equal(storage.includes("usher.ttvnw.net"), false);
     assert.equal(storage.includes("fixture-"), false);
@@ -105,13 +114,13 @@ module.exports = async function checkTwitch(page) {
       assert.equal(await page.evaluate(() => failedTwitch.isConnected), false);
       assert.equal(await player().locator("body").evaluate(() => ivsFixture.instances.length), 0);
       assert.equal(await player().locator("#live").isEnabled(), true);
-      assert.equal(await page.locator('[data-status-container="0"]').getAttribute("data-tone"), "error");
+      assert.equal(await page.locator('[data-status-container="0"]').getAttribute("data-tone"), status === "sourceOffline" ? "neutral" : "error");
       const stoppedAt = revision;
       await page.waitForTimeout(2200);
       assert.equal(revision, stoppedAt, "offline/restricted sources must not retry automatically");
       playlistStatus = 200; await live();
       assert.deepEqual(await player().locator("#video").evaluate((v) => [v.volume, v.muted]), [0.35, false]);
-      assert.equal(await player().locator("#quality").inputValue(), "1080p60");
+      assert.equal(await player().locator("#quality").getAttribute("value"), "1080p60");
     }
     tokenErrors = true;
     await reveal(); await player().locator("#live").click(); await waitStatus("sourceReconnecting");
@@ -135,7 +144,7 @@ module.exports = async function checkTwitch(page) {
     await waitSource(renewed); await waitStatus("sourcePlaying");
     assert.equal(await page.evaluate(() => failedPlayer.isConnected), false);
     assert.deepEqual(await player().locator("#video").evaluate((v) => [v.volume, v.muted]), [0.35, false]);
-    assert.equal(await player().locator("#quality").inputValue(), "1080p60");
+    assert.equal(await player().locator("#quality").getAttribute("value"), "1080p60");
     assert.equal(remoteNavigations, 0);
     assert.equal(await page.evaluate(() => originalKick.isConnected), true);
     console.log("PASS: definitive failures stop; transient failures allow LIVE; expired playback authorization automatically refreshes and rebuilds only its pane");

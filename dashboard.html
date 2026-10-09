@@ -7,6 +7,15 @@
     <link rel="stylesheet" href="src/dashboard.css">
   </head>
   <body>
+    <nav class="view-tools" id="viewTools" aria-label="Viewing controls">
+      <div class="view-tools-bar">
+        <button id="openControlsButton" type="button" aria-controls="controlOverlay" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="2"></rect><rect x="14" y="4" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="6" rx="2"></rect></svg>
+          <span id="openControlsLabel">Sources and layout</span>
+        </button>
+        <button class="icon-button" id="viewFullscreenButton" type="button" title="Layout fullscreen" aria-label="Layout fullscreen"></button>
+      </div>
+    </nav>
     <main class="app-shell">
       <section class="stage layout-4" id="stage" aria-label="Stream Layout"></section>
     </main>
@@ -17,7 +26,7 @@
           <div class="dialog-head">
             <div class="dialog-brand">
               <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2"></rect><rect x="14" y="4" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="6" rx="2"></rect></svg>
+                <img class="brand-mascot-img" src="assets/icon128.png" alt="" width="28" height="28">
               </span>
               <div>
                 <h1 id="controlsTitle">Stream Layout</h1>
@@ -36,12 +45,6 @@
                 </svg>
               </button>
 
-              <button class="icon-button" id="fullscreenButton" type="button" title="Layout fullscreen" aria-label="Layout fullscreen">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                </svg>
-              </button>
-
               <button class="icon-button" id="closeControlsButton" type="button" title="Close" aria-label="Close">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M18 6 6 18M6 6l12 12"></path>
@@ -56,15 +59,29 @@
             <button class="segment" type="button" data-layout="4" aria-pressed="false">4</button>
           </div>
 
-          <button class="maximize-layout-button" id="maximizeLayoutButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"></path><path d="m3 3 6 6m12-6-6 6m6 12-6-6M3 21l6-6"></path></svg>
-            <span id="maximizeLayoutLabel">Maximize current layout</span>
-          </button>
+          <div class="layout-actions">
+            <button class="maximize-layout-button" id="maximizeLayoutButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"></path><path d="m3 3 6 6m12-6-6 6m6 12-6-6M3 21l6-6"></path></svg>
+              <span id="maximizeLayoutLabel">Fit to window</span>
+            </button>
+            <button class="maximize-layout-button" id="fullscreenButton" type="button">
+              <span id="fullscreenIcon" aria-hidden="true"></span>
+              <span id="fullscreenLabel">Layout fullscreen</span>
+            </button>
+          </div>
 
+          <div class="storage-notice" id="storageNotice" role="alert" hidden>
+            <span id="storageMessage"></span>
+            <button class="text-button" id="retrySaveButton" type="button">Retry save</button>
+          </div>
           <p class="playback-notice" id="playbackNotice" role="status" hidden></p>
           <div class="slot-controls" id="slotControls"></div>
 
           <div class="form-footer">
+            <div class="source-menu-notice" id="sourceMenuNotice" role="status" hidden>
+              <span id="sourceMenuMessage"></span>
+              <button class="text-button" id="dismissSourceMenuButton" type="button">Dismiss</button>
+            </div>
             <div class="draft-notice" id="draftNotice" hidden>
               <span id="pendingStatus" role="status"></span>
               <button class="text-button" id="discardButton" type="button">Discard changes</button>
@@ -83,9 +100,14 @@
       </section>
     </div>
 
+    <script src="src/state-model.js"></script>
+    <script src="src/i18n.js"></script>
+    <script src="src/storage.js"></script>
+    <script src="src/sources.js"></script>
     <script src="src/twitch-source.js"></script>
     <script src="src/live-recovery.js"></script>
     <script src="src/live-host.js"></script>
+    <script src="src/dashboard-ui.js"></script>
     <script src="src/dashboard.js"></script>
   </body>
 </html>

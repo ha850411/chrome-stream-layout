@@ -1,0 +1,2039 @@
+{
+  "kind": "offline-synthetic-four-pane",
+  "requestedSeconds": 1800,
+  "node": "v18.19.1",
+  "platform": "linux 6.6.87.2-microsoft-standard-WSL2",
+  "logicalCPUs": 16,
+  "relay": "workspace",
+  "memory": "Sum of Chrome process RSS on Linux (shared pages may be counted more than once); dashboard JS heap is separate.",
+  "cpu": "Chrome process CPU-seconds delta / wall-seconds; 100% equals one logical CPU, not whole-machine utilization.",
+  "samples": [
+    {
+      "seconds": 0.007,
+      "cpuPercent": null,
+      "chromeRSSMB": 956.77734375,
+      "dashboardHeapMB": 1.8457221984863281,
+      "videos": [
+        {
+          "frames": 153,
+          "dropped": 1,
+          "mutations": 1540,
+          "playing": true
+        },
+        {
+          "frames": 152,
+          "dropped": 2,
+          "mutations": 1530,
+          "playing": true
+        },
+        {
+          "frames": 152,
+          "dropped": 2,
+          "mutations": 1530,
+          "playing": true
+        },
+        {
+          "frames": 152,
+          "dropped": 2,
+          "mutations": 1530,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 30.024,
+      "cpuPercent": 28.550488056767833,
+      "chromeRSSMB": 954.99609375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 1053,
+          "dropped": 10,
+          "mutations": 10640,
+          "playing": true
+        },
+        {
+          "frames": 1053,
+          "dropped": 20,
+          "mutations": 10630,
+          "playing": true
+        },
+        {
+          "frames": 1052,
+          "dropped": 20,
+          "mutations": 10630,
+          "playing": true
+        },
+        {
+          "frames": 1053,
+          "dropped": 19,
+          "mutations": 10630,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 60.035,
+      "cpuPercent": 27.12338809103329,
+      "chromeRSSMB": 959.203125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 1952,
+          "dropped": 18,
+          "mutations": 19730,
+          "playing": true
+        },
+        {
+          "frames": 1953,
+          "dropped": 36,
+          "mutations": 19720,
+          "playing": true
+        },
+        {
+          "frames": 1951,
+          "dropped": 36,
+          "mutations": 19720,
+          "playing": true
+        },
+        {
+          "frames": 1952,
+          "dropped": 35,
+          "mutations": 19720,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 89.652,
+      "cpuPercent": 28.86855522166323,
+      "chromeRSSMB": 968.75390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 2851,
+          "dropped": 34,
+          "mutations": 28830,
+          "playing": true
+        },
+        {
+          "frames": 2853,
+          "dropped": 51,
+          "mutations": 28820,
+          "playing": true
+        },
+        {
+          "frames": 2851,
+          "dropped": 56,
+          "mutations": 28820,
+          "playing": true
+        },
+        {
+          "frames": 2851,
+          "dropped": 54,
+          "mutations": 28820,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 119.162,
+      "cpuPercent": 28.363266689257884,
+      "chromeRSSMB": 969.078125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 3749,
+          "dropped": 43,
+          "mutations": 37920,
+          "playing": true
+        },
+        {
+          "frames": 3754,
+          "dropped": 59,
+          "mutations": 37920,
+          "playing": true
+        },
+        {
+          "frames": 3750,
+          "dropped": 68,
+          "mutations": 37910,
+          "playing": true
+        },
+        {
+          "frames": 3748,
+          "dropped": 68,
+          "mutations": 37910,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 148.705,
+      "cpuPercent": 28.771621026977634,
+      "chromeRSSMB": 968.98828125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 4649,
+          "dropped": 55,
+          "mutations": 47020,
+          "playing": true
+        },
+        {
+          "frames": 4654,
+          "dropped": 76,
+          "mutations": 47010,
+          "playing": true
+        },
+        {
+          "frames": 4650,
+          "dropped": 90,
+          "mutations": 47010,
+          "playing": true
+        },
+        {
+          "frames": 4646,
+          "dropped": 85,
+          "mutations": 47010,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 178.205,
+      "cpuPercent": 28.84745762711864,
+      "chromeRSSMB": 968.90625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 5549,
+          "dropped": 66,
+          "mutations": 56110,
+          "playing": true
+        },
+        {
+          "frames": 5555,
+          "dropped": 88,
+          "mutations": 56110,
+          "playing": true
+        },
+        {
+          "frames": 5549,
+          "dropped": 102,
+          "mutations": 56110,
+          "playing": true
+        },
+        {
+          "frames": 5546,
+          "dropped": 100,
+          "mutations": 56100,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 207.708,
+      "cpuPercent": 28.912314001965893,
+      "chromeRSSMB": 969.109375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 6448,
+          "dropped": 80,
+          "mutations": 65210,
+          "playing": true
+        },
+        {
+          "frames": 6455,
+          "dropped": 101,
+          "mutations": 65200,
+          "playing": true
+        },
+        {
+          "frames": 6449,
+          "dropped": 120,
+          "mutations": 65200,
+          "playing": true
+        },
+        {
+          "frames": 6444,
+          "dropped": 113,
+          "mutations": 65200,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 237.72,
+      "cpuPercent": 29.28828468612555,
+      "chromeRSSMB": 969.43359375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 7348,
+          "dropped": 92,
+          "mutations": 74300,
+          "playing": true
+        },
+        {
+          "frames": 7356,
+          "dropped": 112,
+          "mutations": 74300,
+          "playing": true
+        },
+        {
+          "frames": 7347,
+          "dropped": 133,
+          "mutations": 74290,
+          "playing": true
+        },
+        {
+          "frames": 7343,
+          "dropped": 130,
+          "mutations": 74290,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 267.226,
+      "cpuPercent": 29.214397071782024,
+      "chromeRSSMB": 969.484375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 8247,
+          "dropped": 106,
+          "mutations": 83400,
+          "playing": true
+        },
+        {
+          "frames": 8256,
+          "dropped": 122,
+          "mutations": 83390,
+          "playing": true
+        },
+        {
+          "frames": 8248,
+          "dropped": 145,
+          "mutations": 83390,
+          "playing": true
+        },
+        {
+          "frames": 8243,
+          "dropped": 150,
+          "mutations": 83390,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 296.729,
+      "cpuPercent": 29.55631630681625,
+      "chromeRSSMB": 969.58984375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 9146,
+          "dropped": 119,
+          "mutations": 92490,
+          "playing": true
+        },
+        {
+          "frames": 9157,
+          "dropped": 139,
+          "mutations": 92490,
+          "playing": true
+        },
+        {
+          "frames": 9147,
+          "dropped": 163,
+          "mutations": 92480,
+          "playing": true
+        },
+        {
+          "frames": 9142,
+          "dropped": 169,
+          "mutations": 92480,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 326.235,
+      "cpuPercent": 28.604351657290046,
+      "chromeRSSMB": 969.36328125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 10045,
+          "dropped": 133,
+          "mutations": 101590,
+          "playing": true
+        },
+        {
+          "frames": 10057,
+          "dropped": 157,
+          "mutations": 101580,
+          "playing": true
+        },
+        {
+          "frames": 10047,
+          "dropped": 186,
+          "mutations": 101580,
+          "playing": true
+        },
+        {
+          "frames": 10042,
+          "dropped": 187,
+          "mutations": 101580,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 355.731,
+      "cpuPercent": 28.749660970979107,
+      "chromeRSSMB": 969.5625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 10944,
+          "dropped": 147,
+          "mutations": 110680,
+          "playing": true
+        },
+        {
+          "frames": 10958,
+          "dropped": 175,
+          "mutations": 110680,
+          "playing": true
+        },
+        {
+          "frames": 10947,
+          "dropped": 207,
+          "mutations": 110670,
+          "playing": true
+        },
+        {
+          "frames": 10939,
+          "dropped": 205,
+          "mutations": 110670,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 385.227,
+      "cpuPercent": 28.85136967724441,
+      "chromeRSSMB": 969.5390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 11843,
+          "dropped": 159,
+          "mutations": 119770,
+          "playing": true
+        },
+        {
+          "frames": 11858,
+          "dropped": 187,
+          "mutations": 119770,
+          "playing": true
+        },
+        {
+          "frames": 11846,
+          "dropped": 225,
+          "mutations": 119770,
+          "playing": true
+        },
+        {
+          "frames": 11839,
+          "dropped": 221,
+          "mutations": 119770,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 414.732,
+      "cpuPercent": 28.910354177258064,
+      "chromeRSSMB": 969.16015625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 12743,
+          "dropped": 170,
+          "mutations": 128870,
+          "playing": true
+        },
+        {
+          "frames": 12758,
+          "dropped": 202,
+          "mutations": 128860,
+          "playing": true
+        },
+        {
+          "frames": 12746,
+          "dropped": 245,
+          "mutations": 128860,
+          "playing": true
+        },
+        {
+          "frames": 12737,
+          "dropped": 240,
+          "mutations": 128860,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 444.234,
+      "cpuPercent": 29.8623822113755,
+      "chromeRSSMB": 968.96484375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 13642,
+          "dropped": 185,
+          "mutations": 137960,
+          "playing": true
+        },
+        {
+          "frames": 13658,
+          "dropped": 214,
+          "mutations": 137960,
+          "playing": true
+        },
+        {
+          "frames": 13644,
+          "dropped": 261,
+          "mutations": 137960,
+          "playing": true
+        },
+        {
+          "frames": 13636,
+          "dropped": 257,
+          "mutations": 137950,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 473.738,
+      "cpuPercent": 28.979121475054264,
+      "chromeRSSMB": 972.89453125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 14542,
+          "dropped": 203,
+          "mutations": 147060,
+          "playing": true
+        },
+        {
+          "frames": 14558,
+          "dropped": 232,
+          "mutations": 147050,
+          "playing": true
+        },
+        {
+          "frames": 14544,
+          "dropped": 285,
+          "mutations": 147050,
+          "playing": true
+        },
+        {
+          "frames": 14534,
+          "dropped": 282,
+          "mutations": 147050,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 503.251,
+      "cpuPercent": 29.85125199064816,
+      "chromeRSSMB": 972.39453125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 15441,
+          "dropped": 212,
+          "mutations": 156150,
+          "playing": true
+        },
+        {
+          "frames": 15459,
+          "dropped": 248,
+          "mutations": 156150,
+          "playing": true
+        },
+        {
+          "frames": 15443,
+          "dropped": 303,
+          "mutations": 156140,
+          "playing": true
+        },
+        {
+          "frames": 15433,
+          "dropped": 297,
+          "mutations": 156140,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 532.764,
+      "cpuPercent": 29.410768136075617,
+      "chromeRSSMB": 972.50390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 16340,
+          "dropped": 228,
+          "mutations": 165250,
+          "playing": true
+        },
+        {
+          "frames": 16359,
+          "dropped": 262,
+          "mutations": 165240,
+          "playing": true
+        },
+        {
+          "frames": 16344,
+          "dropped": 323,
+          "mutations": 165240,
+          "playing": true
+        },
+        {
+          "frames": 16332,
+          "dropped": 318,
+          "mutations": 165240,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 562.281,
+      "cpuPercent": 29.237388623505144,
+      "chromeRSSMB": 972.73046875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 17239,
+          "dropped": 244,
+          "mutations": 174340,
+          "playing": true
+        },
+        {
+          "frames": 17260,
+          "dropped": 281,
+          "mutations": 174340,
+          "playing": true
+        },
+        {
+          "frames": 17242,
+          "dropped": 344,
+          "mutations": 174330,
+          "playing": true
+        },
+        {
+          "frames": 17231,
+          "dropped": 339,
+          "mutations": 174330,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 591.805,
+      "cpuPercent": 29.23045657769949,
+      "chromeRSSMB": 973.34765625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 18139,
+          "dropped": 259,
+          "mutations": 183440,
+          "playing": true
+        },
+        {
+          "frames": 18160,
+          "dropped": 299,
+          "mutations": 183430,
+          "playing": true
+        },
+        {
+          "frames": 18143,
+          "dropped": 366,
+          "mutations": 183430,
+          "playing": true
+        },
+        {
+          "frames": 18131,
+          "dropped": 360,
+          "mutations": 183430,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 621.818,
+      "cpuPercent": 29.054076566821003,
+      "chromeRSSMB": 973.67578125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 19038,
+          "dropped": 272,
+          "mutations": 192530,
+          "playing": true
+        },
+        {
+          "frames": 19061,
+          "dropped": 315,
+          "mutations": 192530,
+          "playing": true
+        },
+        {
+          "frames": 19042,
+          "dropped": 383,
+          "mutations": 192520,
+          "playing": true
+        },
+        {
+          "frames": 19028,
+          "dropped": 379,
+          "mutations": 192520,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 651.327,
+      "cpuPercent": 29.414754820563253,
+      "chromeRSSMB": 973.29296875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 19939,
+          "dropped": 292,
+          "mutations": 201630,
+          "playing": true
+        },
+        {
+          "frames": 19961,
+          "dropped": 335,
+          "mutations": 201620,
+          "playing": true
+        },
+        {
+          "frames": 19942,
+          "dropped": 411,
+          "mutations": 201620,
+          "playing": true
+        },
+        {
+          "frames": 19928,
+          "dropped": 405,
+          "mutations": 201620,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 680.816,
+      "cpuPercent": 28.993862118077878,
+      "chromeRSSMB": 973.03125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 20838,
+          "dropped": 304,
+          "mutations": 210720,
+          "playing": true
+        },
+        {
+          "frames": 20862,
+          "dropped": 356,
+          "mutations": 210720,
+          "playing": true
+        },
+        {
+          "frames": 20841,
+          "dropped": 430,
+          "mutations": 210710,
+          "playing": true
+        },
+        {
+          "frames": 20826,
+          "dropped": 426,
+          "mutations": 210710,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 710.299,
+      "cpuPercent": 29.169351829868102,
+      "chromeRSSMB": 973.28515625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 21738,
+          "dropped": 325,
+          "mutations": 219820,
+          "playing": true
+        },
+        {
+          "frames": 21762,
+          "dropped": 377,
+          "mutations": 219810,
+          "playing": true
+        },
+        {
+          "frames": 21741,
+          "dropped": 453,
+          "mutations": 219810,
+          "playing": true
+        },
+        {
+          "frames": 21727,
+          "dropped": 452,
+          "mutations": 219810,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 739.785,
+      "cpuPercent": 28.284609645255372,
+      "chromeRSSMB": 973.40234375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 22637,
+          "dropped": 337,
+          "mutations": 228910,
+          "playing": true
+        },
+        {
+          "frames": 22662,
+          "dropped": 391,
+          "mutations": 228900,
+          "playing": true
+        },
+        {
+          "frames": 22640,
+          "dropped": 471,
+          "mutations": 228900,
+          "playing": true
+        },
+        {
+          "frames": 22625,
+          "dropped": 467,
+          "mutations": 228900,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 769.289,
+      "cpuPercent": 23.18329718004334,
+      "chromeRSSMB": 973.27734375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 23535,
+          "dropped": 346,
+          "mutations": 238000,
+          "playing": true
+        },
+        {
+          "frames": 23562,
+          "dropped": 398,
+          "mutations": 238000,
+          "playing": true
+        },
+        {
+          "frames": 23540,
+          "dropped": 481,
+          "mutations": 238000,
+          "playing": true
+        },
+        {
+          "frames": 23525,
+          "dropped": 477,
+          "mutations": 238000,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 798.783,
+      "cpuPercent": 22.17400149182888,
+      "chromeRSSMB": 973.49609375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 24434,
+          "dropped": 357,
+          "mutations": 247100,
+          "playing": true
+        },
+        {
+          "frames": 24462,
+          "dropped": 405,
+          "mutations": 247090,
+          "playing": true
+        },
+        {
+          "frames": 24440,
+          "dropped": 487,
+          "mutations": 247090,
+          "playing": true
+        },
+        {
+          "frames": 24422,
+          "dropped": 488,
+          "mutations": 247090,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 828.261,
+      "cpuPercent": 21.677182983920158,
+      "chromeRSSMB": 973.41796875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 25332,
+          "dropped": 366,
+          "mutations": 256190,
+          "playing": true
+        },
+        {
+          "frames": 25363,
+          "dropped": 415,
+          "mutations": 256190,
+          "playing": true
+        },
+        {
+          "frames": 25339,
+          "dropped": 498,
+          "mutations": 256180,
+          "playing": true
+        },
+        {
+          "frames": 25319,
+          "dropped": 498,
+          "mutations": 256180,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 857.744,
+      "cpuPercent": 21.096903300206975,
+      "chromeRSSMB": 973.52734375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 26232,
+          "dropped": 375,
+          "mutations": 265280,
+          "playing": true
+        },
+        {
+          "frames": 26263,
+          "dropped": 422,
+          "mutations": 265280,
+          "playing": true
+        },
+        {
+          "frames": 26239,
+          "dropped": 507,
+          "mutations": 265280,
+          "playing": true
+        },
+        {
+          "frames": 26219,
+          "dropped": 505,
+          "mutations": 265280,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 887.24,
+      "cpuPercent": 21.22321670735018,
+      "chromeRSSMB": 973.75390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 27131,
+          "dropped": 384,
+          "mutations": 274380,
+          "playing": true
+        },
+        {
+          "frames": 27163,
+          "dropped": 432,
+          "mutations": 274370,
+          "playing": true
+        },
+        {
+          "frames": 27138,
+          "dropped": 519,
+          "mutations": 274370,
+          "playing": true
+        },
+        {
+          "frames": 27116,
+          "dropped": 514,
+          "mutations": 274370,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 916.726,
+      "cpuPercent": 22.790476836464673,
+      "chromeRSSMB": 973.65625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 28031,
+          "dropped": 394,
+          "mutations": 283470,
+          "playing": true
+        },
+        {
+          "frames": 28064,
+          "dropped": 445,
+          "mutations": 283470,
+          "playing": true
+        },
+        {
+          "frames": 28037,
+          "dropped": 535,
+          "mutations": 283470,
+          "playing": true
+        },
+        {
+          "frames": 28017,
+          "dropped": 526,
+          "mutations": 283470,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 946.207,
+      "cpuPercent": 20.928733760727294,
+      "chromeRSSMB": 973.0390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 28930,
+          "dropped": 405,
+          "mutations": 292570,
+          "playing": true
+        },
+        {
+          "frames": 28964,
+          "dropped": 454,
+          "mutations": 292560,
+          "playing": true
+        },
+        {
+          "frames": 28937,
+          "dropped": 547,
+          "mutations": 292560,
+          "playing": true
+        },
+        {
+          "frames": 28916,
+          "dropped": 537,
+          "mutations": 292560,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 975.686,
+      "cpuPercent": 21.13368838834416,
+      "chromeRSSMB": 973.53125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 29830,
+          "dropped": 413,
+          "mutations": 301660,
+          "playing": true
+        },
+        {
+          "frames": 29865,
+          "dropped": 464,
+          "mutations": 301660,
+          "playing": true
+        },
+        {
+          "frames": 29836,
+          "dropped": 559,
+          "mutations": 301660,
+          "playing": true
+        },
+        {
+          "frames": 29815,
+          "dropped": 546,
+          "mutations": 301650,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1005.697,
+      "cpuPercent": 21.725367365299388,
+      "chromeRSSMB": 973.421875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 30729,
+          "dropped": 424,
+          "mutations": 310760,
+          "playing": true
+        },
+        {
+          "frames": 30765,
+          "dropped": 475,
+          "mutations": 310750,
+          "playing": true
+        },
+        {
+          "frames": 30736,
+          "dropped": 571,
+          "mutations": 310750,
+          "playing": true
+        },
+        {
+          "frames": 30715,
+          "dropped": 556,
+          "mutations": 310750,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1035.174,
+      "cpuPercent": 28.49679411066258,
+      "chromeRSSMB": 973.234375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 31628,
+          "dropped": 436,
+          "mutations": 319850,
+          "playing": true
+        },
+        {
+          "frames": 31666,
+          "dropped": 494,
+          "mutations": 319850,
+          "playing": true
+        },
+        {
+          "frames": 31636,
+          "dropped": 589,
+          "mutations": 319840,
+          "playing": true
+        },
+        {
+          "frames": 31613,
+          "dropped": 573,
+          "mutations": 319840,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1064.656,
+      "cpuPercent": 28.59371820093617,
+      "chromeRSSMB": 972.95703125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 32528,
+          "dropped": 452,
+          "mutations": 328950,
+          "playing": true
+        },
+        {
+          "frames": 32566,
+          "dropped": 518,
+          "mutations": 328940,
+          "playing": true
+        },
+        {
+          "frames": 32536,
+          "dropped": 615,
+          "mutations": 328940,
+          "playing": true
+        },
+        {
+          "frames": 32513,
+          "dropped": 594,
+          "mutations": 328940,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1094.142,
+      "cpuPercent": 29.234212846774817,
+      "chromeRSSMB": 973.2265625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 33427,
+          "dropped": 467,
+          "mutations": 338040,
+          "playing": true
+        },
+        {
+          "frames": 33466,
+          "dropped": 535,
+          "mutations": 338030,
+          "playing": true
+        },
+        {
+          "frames": 33436,
+          "dropped": 634,
+          "mutations": 338030,
+          "playing": true
+        },
+        {
+          "frames": 33410,
+          "dropped": 608,
+          "mutations": 338030,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1123.626,
+      "cpuPercent": 29.236195902862498,
+      "chromeRSSMB": 973.56640625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 34326,
+          "dropped": 476,
+          "mutations": 347130,
+          "playing": true
+        },
+        {
+          "frames": 34366,
+          "dropped": 547,
+          "mutations": 347130,
+          "playing": true
+        },
+        {
+          "frames": 34334,
+          "dropped": 652,
+          "mutations": 347130,
+          "playing": true
+        },
+        {
+          "frames": 34309,
+          "dropped": 622,
+          "mutations": 347130,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1153.12,
+      "cpuPercent": 38.27897199430397,
+      "chromeRSSMB": 973.4453125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 35225,
+          "dropped": 484,
+          "mutations": 356230,
+          "playing": true
+        },
+        {
+          "frames": 35266,
+          "dropped": 555,
+          "mutations": 356220,
+          "playing": true
+        },
+        {
+          "frames": 35234,
+          "dropped": 664,
+          "mutations": 356220,
+          "playing": true
+        },
+        {
+          "frames": 35206,
+          "dropped": 632,
+          "mutations": 356220,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1182.609,
+      "cpuPercent": 31.164162908203053,
+      "chromeRSSMB": 973.43359375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 36125,
+          "dropped": 496,
+          "mutations": 365320,
+          "playing": true
+        },
+        {
+          "frames": 36167,
+          "dropped": 572,
+          "mutations": 365320,
+          "playing": true
+        },
+        {
+          "frames": 36133,
+          "dropped": 683,
+          "mutations": 365320,
+          "playing": true
+        },
+        {
+          "frames": 36107,
+          "dropped": 651,
+          "mutations": 365320,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1212.098,
+      "cpuPercent": 29.875546814066233,
+      "chromeRSSMB": 973.3125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 37024,
+          "dropped": 514,
+          "mutations": 374420,
+          "playing": true
+        },
+        {
+          "frames": 37067,
+          "dropped": 589,
+          "mutations": 374410,
+          "playing": true
+        },
+        {
+          "frames": 37032,
+          "dropped": 702,
+          "mutations": 374410,
+          "playing": true
+        },
+        {
+          "frames": 37006,
+          "dropped": 670,
+          "mutations": 374410,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1241.581,
+      "cpuPercent": 30.32255876267682,
+      "chromeRSSMB": 973.46484375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 37923,
+          "dropped": 527,
+          "mutations": 383510,
+          "playing": true
+        },
+        {
+          "frames": 37968,
+          "dropped": 600,
+          "mutations": 383510,
+          "playing": true
+        },
+        {
+          "frames": 37932,
+          "dropped": 717,
+          "mutations": 383510,
+          "playing": true
+        },
+        {
+          "frames": 37906,
+          "dropped": 684,
+          "mutations": 383510,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1271.068,
+      "cpuPercent": 30.5219249160647,
+      "chromeRSSMB": 973.38671875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 38823,
+          "dropped": 542,
+          "mutations": 392610,
+          "playing": true
+        },
+        {
+          "frames": 38868,
+          "dropped": 618,
+          "mutations": 392600,
+          "playing": true
+        },
+        {
+          "frames": 38832,
+          "dropped": 739,
+          "mutations": 392600,
+          "playing": true
+        },
+        {
+          "frames": 38804,
+          "dropped": 703,
+          "mutations": 392600,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1300.556,
+      "cpuPercent": 30.92783505154637,
+      "chromeRSSMB": 973.7734375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 39722,
+          "dropped": 551,
+          "mutations": 401700,
+          "playing": true
+        },
+        {
+          "frames": 39769,
+          "dropped": 634,
+          "mutations": 401700,
+          "playing": true
+        },
+        {
+          "frames": 39732,
+          "dropped": 753,
+          "mutations": 401700,
+          "playing": true
+        },
+        {
+          "frames": 39703,
+          "dropped": 714,
+          "mutations": 401690,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1330.027,
+      "cpuPercent": 29.927725560720774,
+      "chromeRSSMB": 973.38671875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 40622,
+          "dropped": 567,
+          "mutations": 410800,
+          "playing": true
+        },
+        {
+          "frames": 40669,
+          "dropped": 647,
+          "mutations": 410790,
+          "playing": true
+        },
+        {
+          "frames": 40631,
+          "dropped": 771,
+          "mutations": 410790,
+          "playing": true
+        },
+        {
+          "frames": 40603,
+          "dropped": 731,
+          "mutations": 410790,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1359.504,
+      "cpuPercent": 29.92163381619562,
+      "chromeRSSMB": 973.4921875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 41521,
+          "dropped": 582,
+          "mutations": 419890,
+          "playing": true
+        },
+        {
+          "frames": 41570,
+          "dropped": 661,
+          "mutations": 419890,
+          "playing": true
+        },
+        {
+          "frames": 41530,
+          "dropped": 791,
+          "mutations": 419880,
+          "playing": true
+        },
+        {
+          "frames": 41500,
+          "dropped": 752,
+          "mutations": 419880,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1389.517,
+      "cpuPercent": 32.3859660813647,
+      "chromeRSSMB": 973.3203125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 42422,
+          "dropped": 597,
+          "mutations": 428990,
+          "playing": true
+        },
+        {
+          "frames": 42470,
+          "dropped": 679,
+          "mutations": 428980,
+          "playing": true
+        },
+        {
+          "frames": 42430,
+          "dropped": 810,
+          "mutations": 428980,
+          "playing": true
+        },
+        {
+          "frames": 42400,
+          "dropped": 771,
+          "mutations": 428980,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1419.007,
+      "cpuPercent": 31.976941336046107,
+      "chromeRSSMB": 973.41796875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 43321,
+          "dropped": 616,
+          "mutations": 438080,
+          "playing": true
+        },
+        {
+          "frames": 43371,
+          "dropped": 692,
+          "mutations": 438080,
+          "playing": true
+        },
+        {
+          "frames": 43329,
+          "dropped": 835,
+          "mutations": 438070,
+          "playing": true
+        },
+        {
+          "frames": 43298,
+          "dropped": 793,
+          "mutations": 438070,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1448.511,
+      "cpuPercent": 31.758405639913214,
+      "chromeRSSMB": 973.44921875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 44220,
+          "dropped": 631,
+          "mutations": 447170,
+          "playing": true
+        },
+        {
+          "frames": 44271,
+          "dropped": 704,
+          "mutations": 447170,
+          "playing": true
+        },
+        {
+          "frames": 44229,
+          "dropped": 855,
+          "mutations": 447170,
+          "playing": true
+        },
+        {
+          "frames": 44199,
+          "dropped": 811,
+          "mutations": 447170,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1477.943,
+      "cpuPercent": 31.428377276433878,
+      "chromeRSSMB": 973.5625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 45118,
+          "dropped": 646,
+          "mutations": 456270,
+          "playing": true
+        },
+        {
+          "frames": 45170,
+          "dropped": 721,
+          "mutations": 456260,
+          "playing": true
+        },
+        {
+          "frames": 45127,
+          "dropped": 876,
+          "mutations": 456260,
+          "playing": true
+        },
+        {
+          "frames": 45097,
+          "dropped": 833,
+          "mutations": 456260,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1507.434,
+      "cpuPercent": 29.839612085042898,
+      "chromeRSSMB": 973.64453125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 46016,
+          "dropped": 660,
+          "mutations": 465360,
+          "playing": true
+        },
+        {
+          "frames": 46071,
+          "dropped": 741,
+          "mutations": 465360,
+          "playing": true
+        },
+        {
+          "frames": 46027,
+          "dropped": 899,
+          "mutations": 465360,
+          "playing": true
+        },
+        {
+          "frames": 45995,
+          "dropped": 854,
+          "mutations": 465360,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1536.905,
+      "cpuPercent": 30.572427131756573,
+      "chromeRSSMB": 973.75390625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 46916,
+          "dropped": 676,
+          "mutations": 474460,
+          "playing": true
+        },
+        {
+          "frames": 46971,
+          "dropped": 763,
+          "mutations": 474450,
+          "playing": true
+        },
+        {
+          "frames": 46926,
+          "dropped": 923,
+          "mutations": 474450,
+          "playing": true
+        },
+        {
+          "frames": 46894,
+          "dropped": 875,
+          "mutations": 474450,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1566.385,
+      "cpuPercent": 31.580732700135755,
+      "chromeRSSMB": 973.56640625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 47815,
+          "dropped": 693,
+          "mutations": 483550,
+          "playing": true
+        },
+        {
+          "frames": 47872,
+          "dropped": 784,
+          "mutations": 483550,
+          "playing": true
+        },
+        {
+          "frames": 47826,
+          "dropped": 949,
+          "mutations": 483550,
+          "playing": true
+        },
+        {
+          "frames": 47792,
+          "dropped": 901,
+          "mutations": 483540,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1595.85,
+      "cpuPercent": 30.57865263872384,
+      "chromeRSSMB": 973.1484375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 48716,
+          "dropped": 705,
+          "mutations": 492650,
+          "playing": true
+        },
+        {
+          "frames": 48772,
+          "dropped": 805,
+          "mutations": 492640,
+          "playing": true
+        },
+        {
+          "frames": 48725,
+          "dropped": 973,
+          "mutations": 492640,
+          "playing": true
+        },
+        {
+          "frames": 48693,
+          "dropped": 924,
+          "mutations": 492640,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1625.329,
+      "cpuPercent": 31.954950982055074,
+      "chromeRSSMB": 973.21484375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 49614,
+          "dropped": 722,
+          "mutations": 501740,
+          "playing": true
+        },
+        {
+          "frames": 49673,
+          "dropped": 825,
+          "mutations": 501740,
+          "playing": true
+        },
+        {
+          "frames": 49625,
+          "dropped": 997,
+          "mutations": 501730,
+          "playing": true
+        },
+        {
+          "frames": 49590,
+          "dropped": 949,
+          "mutations": 501730,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1654.796,
+      "cpuPercent": 31.323175077204972,
+      "chromeRSSMB": 973.08984375,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 50515,
+          "dropped": 736,
+          "mutations": 510840,
+          "playing": true
+        },
+        {
+          "frames": 50573,
+          "dropped": 841,
+          "mutations": 510830,
+          "playing": true
+        },
+        {
+          "frames": 50524,
+          "dropped": 1017,
+          "mutations": 510830,
+          "playing": true
+        },
+        {
+          "frames": 50490,
+          "dropped": 970,
+          "mutations": 510830,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1684.27,
+      "cpuPercent": 30.942525615796985,
+      "chromeRSSMB": 973.20703125,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 51413,
+          "dropped": 755,
+          "mutations": 519930,
+          "playing": true
+        },
+        {
+          "frames": 51473,
+          "dropped": 860,
+          "mutations": 519920,
+          "playing": true
+        },
+        {
+          "frames": 51424,
+          "dropped": 1044,
+          "mutations": 519920,
+          "playing": true
+        },
+        {
+          "frames": 51389,
+          "dropped": 995,
+          "mutations": 519920,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1713.746,
+      "cpuPercent": 31.686796037454307,
+      "chromeRSSMB": 973.1171875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 52312,
+          "dropped": 771,
+          "mutations": 529020,
+          "playing": true
+        },
+        {
+          "frames": 52374,
+          "dropped": 878,
+          "mutations": 529020,
+          "playing": true
+        },
+        {
+          "frames": 52324,
+          "dropped": 1065,
+          "mutations": 529020,
+          "playing": true
+        },
+        {
+          "frames": 52289,
+          "dropped": 1014,
+          "mutations": 529020,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1743.216,
+      "cpuPercent": 30.777061418391593,
+      "chromeRSSMB": 973.296875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 53211,
+          "dropped": 788,
+          "mutations": 538120,
+          "playing": true
+        },
+        {
+          "frames": 53274,
+          "dropped": 897,
+          "mutations": 538110,
+          "playing": true
+        },
+        {
+          "frames": 53223,
+          "dropped": 1089,
+          "mutations": 538110,
+          "playing": true
+        },
+        {
+          "frames": 53187,
+          "dropped": 1038,
+          "mutations": 538110,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1773.226,
+      "cpuPercent": 30.78973675441509,
+      "chromeRSSMB": 973.79296875,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 54110,
+          "dropped": 804,
+          "mutations": 547210,
+          "playing": true
+        },
+        {
+          "frames": 54175,
+          "dropped": 909,
+          "mutations": 547210,
+          "playing": true
+        },
+        {
+          "frames": 54123,
+          "dropped": 1107,
+          "mutations": 547200,
+          "playing": true
+        },
+        {
+          "frames": 54084,
+          "dropped": 1055,
+          "mutations": 547200,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1799.47,
+      "cpuPercent": 30.711781740588297,
+      "chromeRSSMB": 973.6015625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 54914,
+          "dropped": 816,
+          "mutations": 555330,
+          "playing": true
+        },
+        {
+          "frames": 54977,
+          "dropped": 924,
+          "mutations": 555320,
+          "playing": true
+        },
+        {
+          "frames": 54925,
+          "dropped": 1121,
+          "mutations": 555320,
+          "playing": true
+        },
+        {
+          "frames": 54886,
+          "dropped": 1068,
+          "mutations": 555320,
+          "playing": true
+        }
+      ]
+    },
+    {
+      "seconds": 1800.007,
+      "cpuPercent": 29.795158286777763,
+      "chromeRSSMB": 973.7265625,
+      "dashboardHeapMB": 1.4593391418457031,
+      "videos": [
+        {
+          "frames": 54928,
+          "dropped": 816,
+          "mutations": 555490,
+          "playing": true
+        },
+        {
+          "frames": 54994,
+          "dropped": 924,
+          "mutations": 555490,
+          "playing": true
+        },
+        {
+          "frames": 54941,
+          "dropped": 1121,
+          "mutations": 555480,
+          "playing": true
+        },
+        {
+          "frames": 54902,
+          "dropped": 1068,
+          "mutations": 555480,
+          "playing": true
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "browser": "148.0.7778.96",
+  "completed": true,
+  "actualSeconds": 1800.011,
+  "summary": {
+    "averageCPUPercent": 28.784456434814896,
+    "firstRSSMB": 956.77734375,
+    "lastRSSMB": 973.7265625,
+    "droppedFrames": 3922,
+    "totalFrames": 219156
+  }
+}

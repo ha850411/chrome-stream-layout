@@ -17,6 +17,9 @@
   let discoveryTimer = 0;
   let suspended = false;
   let observedTitleNodes = [];
+  let trackedVideo = null;
+  let mediaDiscoveryTimer = 0;
+  let mediaPollTimer = 0;
 
   const send = (type, payload) => window.top.postMessage({ type, ...payload }, extensionOrigin);
   const reportTitle = (force = false) => {
@@ -33,34 +36,59 @@
   // Only watch direct head children for replacement of title/meta elements.
   const headObserver = new MutationObserver(() => scheduleTitleReport());
   const discoveryObserver = new MutationObserver(() => scheduleTitleReport());
-  // A player may insert an empty, paused video after document_idle without
-  // firing any media events. Track video insertion/replacement so that this
-  // doesn't stay "playback unconfirmed" until the user presses Play.
-  const mediaObserver = new MutationObserver((records) => {
-    const hasVideo = (node) => node.nodeType === 1 &&
-      (node.matches("video") || Boolean(node.querySelector("video")));
-    if (records.some((record) => [...record.addedNodes, ...record.removedNodes].some(hasVideo))) {
-      scheduleMediaReport();
-    }
+  // Coalesce first, then search once. Once a player exists, watch only its
+  // ancestor chain for removal; chat and recommendation subtrees stay unwatched.
+  const mediaObserver = new MutationObserver(() => {
+    if (!trackedVideo?.isConnected) scheduleMediaReport();
   });
 
   function scheduleMediaReport() {
     if (suspended || mediaTimer) return;
     mediaTimer = window.setTimeout(() => {
       mediaTimer = 0;
-      reportMediaStatus();
+      reportMediaStatus(null, false, true);
     }, 250);
   }
 
+  function observeMedia(video) {
+    mediaObserver.disconnect();
+    window.clearTimeout(mediaDiscoveryTimer);
+    mediaDiscoveryTimer = 0;
+    if (video) {
+      for (let node = video.parentElement; node; node = node.parentElement) {
+        mediaObserver.observe(node, { childList: true });
+      }
+    } else {
+      mediaObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      mediaDiscoveryTimer = window.setTimeout(() => {
+        mediaObserver.disconnect();
+        mediaDiscoveryTimer = 0;
+      }, 30000);
+    }
+  }
+
+  function pollMedia() {
+    if (suspended) return;
+    reportMediaStatus(null, false, true);
+    // Late paused players and visibility changes still get detected after the
+    // bounded discovery period, without a permanent whole-document observer.
+    mediaPollTimer = window.setTimeout(pollMedia, 10000);
+  }
+
   function startMediaTracking() {
-    mediaObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
-    reportMediaStatus(null, true);
+    stopMediaTracking();
+    trackedVideo = null;
+    observeMedia(null);
+    reportMediaStatus(null, true, true);
+    mediaPollTimer = window.setTimeout(pollMedia, 10000);
   }
 
   function stopMediaTracking() {
     mediaObserver.disconnect();
     window.clearTimeout(mediaTimer);
-    mediaTimer = 0;
+    window.clearTimeout(mediaDiscoveryTimer);
+    window.clearTimeout(mediaPollTimer);
+    mediaTimer = mediaDiscoveryTimer = mediaPollTimer = 0;
   }
 
   function stopDiscovery() {
@@ -95,6 +123,7 @@
   }
 
   function startTitleTracking() {
+    if (document.hidden) return;
     suspended = false;
     if (document.head) headObserver.observe(document.head, { childList: true });
     observeTitleNodes();
@@ -106,20 +135,21 @@
     reportTitle(true);
   }
 
-  function reportMediaStatus(event, force = false) {
+  function reportMediaStatus(event, force = false, rescan = false) {
     if (suspended) return;
-    // Prefer the largest visible video, so a small preview/ad cannot replace
-    // the status of the main player. Events avoid continuous DOM polling.
-    const videos = Array.from(document.querySelectorAll("video"));
-    let video = null;
-    let area = 0;
-    videos.forEach((candidate) => {
-      const rect = candidate.getBoundingClientRect();
-      if (rect.width * rect.height > area) {
-        video = candidate;
-        area = rect.width * rect.height;
+    if (rescan || !trackedVideo?.isConnected || (event && event.target !== trackedVideo)) {
+      let selected = null;
+      let area = 0;
+      document.querySelectorAll("video").forEach((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        if (rect.width * rect.height > area) { selected = candidate; area = rect.width * rect.height; }
+      });
+      if (selected !== trackedVideo) {
+        trackedVideo = selected;
+        observeMedia(trackedVideo);
       }
-    });
+    }
+    const video = trackedVideo;
     if (event && event.target !== video) return;
     const status = !video ? "sourcePageLoaded" : video.error ? "sourceMediaError" :
       video.paused || video.ended ? "sourcePaused" :
@@ -135,21 +165,13 @@
   window.addEventListener("message", (event) => {
     if (event.source !== window.top || event.origin !== extensionOrigin ||
         event.data?.type !== "chrome-stream-layout:request-title") return;
+    if (suspended) return;
     observeTitleNodes();
     reportTitle(true);
-    reportMediaStatus(null, true);
+    reportMediaStatus(null, true, true);
   });
   document.addEventListener("yt-navigate-finish", startTitleTracking);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      startTitleTracking();
-      startMediaTracking();
-    } else {
-      stopDiscovery();
-      stopMediaTracking();
-    }
-  });
-  window.addEventListener("pagehide", () => {
+  function suspendTracking() {
     suspended = true;
     titleObserver.disconnect();
     headObserver.disconnect();
@@ -158,7 +180,16 @@
     stopMediaTracking();
     window.clearTimeout(titleTimer);
     titleTimer = 0;
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      startTitleTracking();
+      startMediaTracking();
+    } else {
+      suspendTracking();
+    }
   });
+  window.addEventListener("pagehide", suspendTracking);
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       startTitleTracking();
@@ -166,6 +197,6 @@
     }
   });
 
-  startTitleTracking();
-  startMediaTracking();
+  if (!document.hidden) { startTitleTracking(); startMediaTracking(); }
+  else suspended = true;
 })();

@@ -35,7 +35,7 @@ module.exports = async function checkLayoutMaximize(page) {
     await page.waitForFunction(() => Array.from(stage.querySelectorAll("[data-tile]")).every((tile) => tile.dataset.status === "sourcePageLoaded"));
     const frames = page.frames().filter((frame) => urls.includes(frame.url()));
     for (const frame of frames) await frame.evaluate(() => { window.maximizePlaybackMarker = "kept"; });
-    assert.equal(await page.locator("#maximizeLayoutButton").textContent().then((text) => text.trim()), layout === 3 ? "最大化目前配置" : "Maximize current layout");
+    assert.equal(await page.locator("#maximizeLayoutButton").textContent().then((text) => text.trim()), layout === 3 ? "適配視窗" : "Fit to window");
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 640, height: 360 }, { width: 320, height: 568 }, { width: 900, height: 280 }, { width: 1920, height: 910 }]) {
       await page.setViewportSize(viewport);
       await page.evaluate(() => openControls());

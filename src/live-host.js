@@ -16,7 +16,7 @@ function getLiveRecovery(tile, sourceUrl) {
     },
     report: (status, terminal) => {
       if (!current()) return;
-      if (terminal) api()?.showError(t(status));
+      if (terminal) api()?.showError(t(status), sourceStatusTone(status));
       else api()?.showNotice(t(status));
       setTileStatus(tile, status);
     }
@@ -33,13 +33,14 @@ function disposeLiveRecovery(tile) {
 function updateLiveContext(frame) {
   const host = liveHosts.get(frame);
   if (!host?.api) return;
-  host.api.setContext({ language: state.language, pane: frame.getAttribute("aria-label"),
+  host.api.setContext({ language: state.language, pane: frame.getAttribute("aria-label"), sourceUrl: frame.dataset.sourceUrl,
     platform: getTwitchLiveChannel(parseUrl(frame.dataset.sourceUrl)) ? "twitch" : "kick",
     liveTitle: t("refreshStreamPane", { number: Number(frame.dataset.tileFrame) + 1 }),
     quality: t("streamQuality"), auto: t("automaticQuality"),
     loading: t("sourceLoading"), error: t("sourceMediaError") });
   if (liveRecoveries.get(frame.closest("[data-tile]"))?.waiting) {
-    host.api.showNotice(t(frame.closest("[data-tile]").dataset.status));
+    const status = frame.closest("[data-tile]").dataset.status;
+    host.api.showNotice(t(status), sourceStatusTone(status));
   }
 }
 
@@ -67,13 +68,24 @@ function createLiveFrame(tile, sourceUrl) {
     host.api = api;
     updateLiveContext(frame);
     api.bind({
+      edit: () => {
+        if (frame.isConnected) openControls(Number(tile.dataset.tile));
+      },
       live: () => {
         if (frame.isConnected) void retryTiles([Number(tile.dataset.tile)], { goLive: true });
       },
       quality: (value) => {
-        if (!frame.isConnected) return;
+        if (!frame.isConnected || frame.dataset.sourceUrl !== state.slots[Number(tile.dataset.tile)].url) return;
         state.slots[Number(tile.dataset.tile)].quality = value;
         void persistState(t("applied"));
+      },
+      preferences: (value, commit = false) => {
+        if (!frame.isConnected || frame.dataset.sourceUrl !== state.slots[Number(tile.dataset.tile)].url) return;
+        Object.assign(state.slots[Number(tile.dataset.tile)], value);
+        window.clearTimeout(host.preferenceTimer);
+        host.preferenceTimer = 0;
+        if (commit) void persistState(t("saved"));
+        else host.preferenceTimer = window.setTimeout(() => { host.preferenceTimer = 0; void persistState(t("saved")); }, 180);
       },
       status: (status) => {
         if (!frame.isConnected || host.resolving) return;
@@ -98,6 +110,8 @@ function disposeLiveFrames(tile) {
   tile.querySelectorAll("iframe[data-live-player]").forEach((frame) => {
     const host = liveHosts.get(frame);
     window.clearTimeout(host?.timer);
+    window.clearTimeout(host?.preferenceTimer);
+    if (host?.preferenceTimer) void persistState(t("saved"));
     host?.finish(null);
     host?.api?.destroy();
     clearFrameLoadTimer(frame);
@@ -146,7 +160,9 @@ function loadLiveTile(tile, sourceUrl, { goLive = false, automatic = false, rebu
       host.resolving = false;
       setTileStatus(tile, "sourceLoading");
       recovery.loaded();
-      api.load({ ...embed, ...preferences, autoplay: goLive || embed.autoplay,
+      const saved = state.slots[Number(tile.dataset.tile)];
+      api.load({ ...embed, ...(typeof saved.muted === "boolean" ? { muted: saved.muted } : {}),
+        volume: saved.volume ?? 1, ...preferences, autoplay: goLive || embed.autoplay,
         quality: state.slots[Number(tile.dataset.tile)].quality || "auto" });
       if (embed.title) setFrameSourceTitle(frame, embed.title);
     } catch (error) {
@@ -161,7 +177,7 @@ function loadLiveTile(tile, sourceUrl, { goLive = false, automatic = false, rebu
       if (!current()) return;
       failedHost.resolving = false;
       if (keptPreferences) api?.setPreferences(keptPreferences);
-      api?.showError(t(key));
+      api?.showError(t(key), sourceStatusTone(key));
       setTileStatus(tile, key);
       recovery.fail({ code: key, retryable: error?.retryable, retryAfterMs: error?.retryAfterMs });
     } finally {

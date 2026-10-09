@@ -1,16 +1,21 @@
 "use strict";
 
+importScripts("state-model.js", "state-service.js", "context-menu.js");
+const saveSettings = createStateService(chrome.storage.local);
+
 const DASHBOARD_PAGE = "dashboard.html";
 const OPEN_CONTROLS_KEY = "chrome-stream-layout-open-controls-request-v1";
-const FRAME_HEADER_TAB_RULE_ID = 9001;
+const LEGACY_FRAME_HEADER_RULE_ID = 9001;
+const FRAME_RULE_START = 10000;
+const FRAME_RULE_END = 20000;
+const FRAME_ORIGINS_KEY = "chrome-stream-layout-frame-origins-v1";
+let frameOrigins = null;
 const YOUTUBE_EMBED_TAB_RULE_ID = 9002;
 const FRAME_HEADER_ACTION = {
   type: "modifyHeaders",
   responseHeaders: [
     { header: "x-frame-options", operation: "remove" },
-    { header: "frame-options", operation: "remove" },
-    { header: "content-security-policy", operation: "remove" },
-    { header: "content-security-policy-report-only", operation: "remove" }
+    { header: "frame-options", operation: "remove" }
   ]
 };
 const YOUTUBE_EMBED_ACTION = {
@@ -28,18 +33,19 @@ let dashboardTabIds = new Set();
 let tabRevision = 0;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "ensure-frame-header-rules") {
+  if (!["ensure-frame-header-rules", "save-settings"].includes(message?.type)) {
     return false;
   }
 
   if (sender.id !== chrome.runtime.id || sender.frameId !== 0 ||
       !Number.isInteger(sender.tab?.id) || sender.tab.id < 0 || !isDashboardUrl(sender.url)) {
-    sendResponse({ ok: false, error: "Only the dashboard can configure frame rules." });
+    sendResponse({ ok: false, error: "Only the dashboard can update settings or frame rules." });
     return false;
   }
 
-  scheduleFrameHeaderRules()
-    .then(() => sendResponse({ ok: true }))
+  (message.type === "ensure-frame-header-rules"
+    ? scheduleFrameHeaderRules(message.origins === undefined ? null : { tabId: sender.tab.id, origins: message.origins }).then(() => ({ ok: true })) : saveSettings(message))
+    .then(sendResponse)
     .catch((error) => sendResponse({ ok: false, error: String(error) }));
 
   return true;
@@ -63,12 +69,15 @@ chrome.tabs.onReplaced.addListener(() => {
 
 // Reconcile persisted session rules whenever the service worker starts.
 refreshFrameHeaderRules();
+initializeSourceContextMenu();
 
 chrome.action.onClicked.addListener(async () => {
   const dashboardUrl = chrome.runtime.getURL(DASHBOARD_PAGE);
   const existingTab = await findDashboardTab();
 
-  await chrome.storage.local.set({ [OPEN_CONTROLS_KEY]: Date.now() });
+  await chrome.storage.local.set({ [OPEN_CONTROLS_KEY]: Date.now() }).catch(() => {
+    console.warn("Could not persist the open-controls request.");
+  });
 
   if (existingTab?.id) {
     await focusTab(existingTab);
@@ -103,9 +112,20 @@ async function focusTab(tab) {
   await chrome.tabs.update(tab.id, { active: true });
 }
 
-function scheduleFrameHeaderRules() {
+function scheduleFrameHeaderRules(config = null) {
   // Serialize reads and writes so a slower update cannot restore stale tab IDs.
   ruleUpdateQueue = ruleUpdateQueue.catch(() => {}).then(async () => {
+    if (!frameOrigins) frameOrigins = (await chrome.storage.session.get(FRAME_ORIGINS_KEY))[FRAME_ORIGINS_KEY] || {};
+    if (config) {
+      if (!Array.isArray(config.origins) || config.origins.length > 4) throw new Error("Invalid frame origins");
+      const origins = [...new Set(config.origins.map((value) => {
+        const url = new URL(value);
+        if (!["http:", "https:"].includes(url.protocol) || url.origin !== value || value.length > 400) throw new Error("Invalid frame origin");
+        return url.origin;
+      }))].sort();
+      frameOrigins = { ...frameOrigins, [config.tabId]: origins };
+      await chrome.storage.session.set({ [FRAME_ORIGINS_KEY]: frameOrigins });
+    }
     let revision;
     do {
       revision = tabRevision;
@@ -128,21 +148,38 @@ async function installFrameHeaderRules() {
   const tabIds = tabs
     .filter((tab) => Number.isInteger(tab.id) && tab.id >= 0 && isDashboardUrl(tab.pendingUrl || tab.url))
     .map((tab) => tab.id).sort((a, b) => a - b);
-  const ruleIds = [FRAME_HEADER_TAB_RULE_ID, YOUTUBE_EMBED_TAB_RULE_ID];
-  const existingRules = (await chrome.declarativeNetRequest.getSessionRules())
-    .filter((rule) => ruleIds.includes(rule.id));
-  // Retain old and discovered IDs until a successful update, including failures.
+  const owned = (id) => id === LEGACY_FRAME_HEADER_RULE_ID || id === YOUTUBE_EMBED_TAB_RULE_ID || (id >= FRAME_RULE_START && id < FRAME_RULE_END);
+  const existingRules = (await chrome.declarativeNetRequest.getSessionRules()).filter((rule) => owned(rule.id));
   dashboardTabIds = new Set([...tabIds, ...existingRules.flatMap((rule) => rule.condition.tabIds || [])]);
-  const addRules = tabIds.length ? [createTabFrameHeaderRule(tabIds), createYouTubeEmbedRule(tabIds)] : [];
-
-  if (existingRules.length === addRules.length && existingRules.every((rule) =>
-    JSON.stringify(rule.condition.tabIds) === JSON.stringify(tabIds))) {
-    dashboardTabIds = new Set(tabIds);
-    return;
+  const addRules = tabIds.length ? [createYouTubeEmbedRule(tabIds)] : [];
+  for (const tabId of tabIds) {
+    const origins = frameOrigins[tabId];
+    if (origins?.length) {
+      const rule = createTabFrameHeaderRule(FRAME_RULE_START + addRules.length, tabId, origins);
+      addRules.push(rule, {
+        ...rule,
+        id: rule.id + 1,
+        action: { type: "modifyHeaders", responseHeaders: [{ header: "content-security-policy", operation: "remove" }] },
+        condition: { ...rule.condition, responseHeaders: [{ header: "content-security-policy", values: ["*frame-ancestors*"] }] }
+      });
+    }
   }
-
-  await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: ruleIds, addRules });
+  // Compare the complete rules: identical tab IDs can still contain an old
+  // blanket action/condition after an extension update.
+  const canonical = (value) => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+    return value;
+  };
+  if (JSON.stringify(canonical(existingRules.sort((a, b) => a.id - b.id))) !== JSON.stringify(canonical(addRules.sort((a, b) => a.id - b.id)))) {
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: existingRules.map((rule) => rule.id), addRules });
+  }
   dashboardTabIds = new Set(tabIds);
+  const activeOrigins = Object.fromEntries(Object.entries(frameOrigins).filter(([id]) => dashboardTabIds.has(Number(id))));
+  if (Object.keys(activeOrigins).length !== Object.keys(frameOrigins).length) {
+    frameOrigins = activeOrigins;
+    await chrome.storage.session.set({ [FRAME_ORIGINS_KEY]: frameOrigins });
+  }
 }
 
 function createYouTubeEmbedRule(tabIds) {
@@ -158,15 +195,15 @@ function createYouTubeEmbedRule(tabIds) {
   };
 }
 
-function createTabFrameHeaderRule(tabIds) {
+function createTabFrameHeaderRule(id, tabId, origins) {
   return {
-    id: FRAME_HEADER_TAB_RULE_ID,
+    id,
     priority: 10,
     action: FRAME_HEADER_ACTION,
     condition: {
-      regexFilter: "^https?://",
+      regexFilter: `^(${origins.map((origin) => origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})/`,
       resourceTypes: ["sub_frame"],
-      tabIds
+      tabIds: [tabId]
     }
   };
 }

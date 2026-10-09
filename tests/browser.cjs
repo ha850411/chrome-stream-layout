@@ -13,7 +13,7 @@ const os = require("node:os");
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), "stream-layout-test-"));
   let context;
   try {
-    for (const entry of ["manifest.json", "dashboard.html", "live-player.html", "src", "assets", "rules"]) {
+    for (const entry of ["manifest.json", "dashboard.html", "live-player.html", "src", "assets"]) {
       await fs.cp(path.join(sourcePath, entry), path.join(extensionPath, entry), { recursive: true });
     }
     // MV3 frames recreated after removal do not reliably receive Playwright's
@@ -64,6 +64,22 @@ const os = require("node:os");
     await page.waitForFunction(() => document.querySelectorAll("[data-tile]").length === 4 && !document.querySelector("#controlOverlay").hidden);
     assert.equal(await page.locator("#playbackNotice").isVisible(), false);
     await page.evaluate(() => closeControls());
+    if (process.env.BROWSER_CHECKS === "player") {
+      await require("./kick-soop-checks.cjs")(page);
+      assert.deepEqual(errors, []);
+      return;
+    }
+    if (process.env.BROWSER_CHECKS === "context-menu") {
+      await require("./context-menu-checks.cjs")(context, page, worker, base);
+      assert.deepEqual(errors, []);
+      return;
+    }
+    if (process.env.BROWSER_CHECKS === "storage") {
+      await require("./storage-checks.cjs")(context, page, base);
+      await require("./frame-rules-checks.cjs")(context, page, worker);
+      assert.deepEqual(errors, []);
+      return;
+    }
 
     await page.evaluate(() => {
       state.layout = 2;
@@ -173,6 +189,7 @@ const os = require("node:os");
 
     await require("./ui-checks.cjs")(page);
     await require("./layout-checks.cjs")(page);
+    await require("./viewing-checks.cjs")(page);
 
     const helperPage = await context.newPage();
     helperPage.on("pageerror", (error) => errors.push(error.message));
@@ -202,6 +219,10 @@ const os = require("node:os");
     await require("./huya-checks.cjs")(context, helperPage);
     await helperPage.close();
     console.log("PASS: YouTube embed fallback, replaced player recovery, and YesLive promotion");
+
+    await require("./storage-checks.cjs")(context, page, base);
+    await require("./context-menu-checks.cjs")(context, page, worker, base);
+    await require("./frame-rules-checks.cjs")(context, page, worker);
 
     const second = await context.newPage();
     await second.goto(`${base}/dashboard.html`);

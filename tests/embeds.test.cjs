@@ -6,7 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
-function loadDashboard(overrides = {}) {
+function loadSources(overrides = {}) {
   const context = vm.createContext({
     URL,
     structuredClone,
@@ -17,15 +17,7 @@ function loadDashboard(overrides = {}) {
       origin: "chrome-extension://test-extension",
       href: "chrome-extension://test-extension/dashboard.html"
     },
-    document: {
-      querySelector: () => ({}),
-      querySelectorAll: () => [],
-      body: {}
-    },
-    ResizeObserver: class {},
-    // Hold UI initialization at its first storage read; exercise the real
-    // routing functions without constructing a dashboard DOM or using network.
-    chrome: { storage: { local: { get: () => new Promise(() => {}) } } },
+    state: { language: "en" },
     fetch: async (url) => {
       const host = new URL(url).hostname;
       if (host === "usher.ttvnw.net") return { ok: true, text: async () => '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nhttps://stream.example/live.m3u8\n' };
@@ -38,11 +30,13 @@ function loadDashboard(overrides = {}) {
     ...overrides
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/twitch-source.js"), "utf8"), context);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/dashboard.js"), "utf8"), context);
+  for (const file of ["state-model", "i18n", "sources"]) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, `../src/${file}.js`), "utf8"), context);
+  }
   return context;
 }
 
-const dashboard = loadDashboard();
+const dashboard = loadSources();
 
 for (const [input, expected] of [
   ["https://play.sooplive.com/afstar1", "https://play.sooplive.com/afstar1/embed"],
@@ -51,7 +45,7 @@ for (const [input, expected] of [
   ["https://play.afreecatv.com/some_channel/123456/", "https://play.sooplive.com/some_channel/123456/embed"]
 ]) {
   test(`SOOP live URLs use the official embedded player: ${input}`, async () => {
-    const context = loadDashboard({ fetch: () => assert.fail("SOOP embeds must not require a lookup") });
+    const context = loadSources({ fetch: () => assert.fail("SOOP embeds must not require a lookup") });
     assert.equal((await context.resolveEmbed(input)).src, expected);
     assert.equal(context.getSourceLabel(input), "SOOP");
   });
@@ -95,7 +89,7 @@ test("Kick preserves explicit playback preferences and supports channel punctuat
 
 test("Kick refresh fetches a new URL each time without changing signed stream parameters", async () => {
   let calls = 0;
-  const context = loadDashboard({ fetch: async (input, options) => {
+  const context = loadSources({ fetch: async (input, options) => {
     const url = new URL(input);
     assert.equal(url.origin + url.pathname, "https://kick.com/api/v2/channels/starladder");
     assert.ok(url.searchParams.get("_"));
@@ -114,10 +108,10 @@ test("Kick refresh fetches a new URL each time without changing signed stream pa
 
 test("Kick distinguishes offline channels from lookup failures", async () => {
   for (const livestream of [null, { is_live: false }]) {
-    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => ({ livestream }) }) });
+    const context = loadSources({ fetch: async () => ({ ok: true, json: async () => ({ livestream }) }) });
     await assert.rejects(context.resolveEmbed("https://kick.com/starladder"), (e) => e.code === "sourceOffline");
   }
-  const context = loadDashboard({ fetch: async () => ({ ok: false }) });
+  const context = loadSources({ fetch: async () => ({ ok: false }) });
   await assert.rejects(context.resolveEmbed("https://kick.com/starladder"), /lookup failed/);
 });
 
@@ -126,14 +120,14 @@ test("Kick rejects malformed API responses and unsafe playback URLs", async () =
     "javascript:alert(1)", "http://stream.example/live.m3u8", "https://stream.example/login.html",
     "https://user:password@stream.example/live.m3u8"
   ].map((playback_url) => ({ livestream: {}, playback_url }))]) {
-    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => payload }) });
+    const context = loadSources({ fetch: async () => ({ ok: true, json: async () => payload }) });
     await assert.rejects(context.resolveEmbed("https://kick.com/starladder"));
   }
 });
 
 test("Kick lookup times out and a subsequent refresh can recover", async () => {
   let calls = 0;
-  const context = loadDashboard({
+  const context = loadSources({
     window: { setTimeout: (fn) => setTimeout(fn, 5), clearTimeout },
     fetch: async (_url, { signal }) => {
       if (++calls > 1) return { ok: true, json: async () => ({ livestream: {}, playback_url: "https://stream.example/fresh.m3u8" }) };
@@ -148,7 +142,7 @@ test("Replacing a Kick lookup aborts the pending network request", async () => {
   let started;
   const pending = new Promise((resolve) => { started = resolve; });
   let aborted = false;
-  const context = loadDashboard({ fetch: async (_url, { signal }) => {
+  const context = loadSources({ fetch: async (_url, { signal }) => {
     started();
     return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
       aborted = true; reject(new Error("aborted"));
@@ -181,7 +175,7 @@ for (const input of [
   "https://m.twitch.tv/ROGER9527?tt_content=channel#player"
 ]) {
   test(`Twitch live channel resolves a signed source for the local player: ${input}`, async () => {
-    const context = loadDashboard();
+    const context = loadSources();
     const result = await context.resolveEmbed(input);
     const url = new URL(result.src);
     assert.equal(result.ok, true);
@@ -199,7 +193,7 @@ for (const input of [
 }
 
 test("Twitch respects explicit playback options", async () => {
-  const context = loadDashboard();
+  const context = loadSources();
   const result = await context.resolveEmbed("https://www.twitch.tv/some_channel?autoplay=false&muted=false");
   const url = new URL(result.src);
   assert.equal(url.pathname, "/api/v2/channel/hls/some_channel.m3u8");
@@ -226,7 +220,7 @@ for (const input of [
   "https://twitch.tv@other.example/roger9527"
 ]) {
   test(`Twitch non-channel URLs are preserved: ${input}`, async () => {
-    const context = loadDashboard({ fetch: () => assert.fail("Non-live Twitch URLs must not query playback APIs") });
+    const context = loadSources({ fetch: () => assert.fail("Non-live Twitch URLs must not query playback APIs") });
     assert.equal((await context.resolveEmbed(input)).src, new URL(input).href);
     assert.equal(context.isLocalLiveSource(new URL(input)), false);
   });
@@ -315,7 +309,7 @@ test("A percent-encoded extension still produces a media label", () => {
 
 test("Concurrent Bilibili lookups share a successful request", async () => {
   let calls = 0;
-  const context = loadDashboard({ fetch: async () => {
+  const context = loadSources({ fetch: async () => {
     calls++;
     return { ok: true, json: async () => ({ code: 0, data: { room_id: 123456 } }) };
   } });
@@ -326,7 +320,7 @@ test("Concurrent Bilibili lookups share a successful request", async () => {
 
 test("Failed Bilibili requests can be retried instead of caching the short ID", async () => {
   let calls = 0;
-  const context = loadDashboard({ fetch: async () => ++calls === 1
+  const context = loadSources({ fetch: async () => ++calls === 1
     ? { ok: false }
     : { ok: true, json: async () => ({ data: { room_id: 123456 } }) }
   });
@@ -337,7 +331,7 @@ test("Failed Bilibili requests can be retried instead of caching the short ID", 
 
 test("Bilibili API failures and invalid room IDs are not treated as success", async () => {
   for (const payload of [{ code: -400 }, { code: 1, data: { room_id: 123 } }, { data: { room_id: 0 } }, {}]) {
-    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => payload }) });
+    const context = loadSources({ fetch: async () => ({ ok: true, json: async () => payload }) });
     await assert.rejects(context.resolveBilibiliLiveRoomId("6"));
   }
 });
@@ -345,7 +339,7 @@ test("Bilibili API failures and invalid room IDs are not treated as success", as
 test("A lookup timeout aborts the request and allows another attempt", async () => {
   let calls = 0;
   let aborted = 0;
-  const context = loadDashboard({
+  const context = loadSources({
     window: { setTimeout: (fn) => setTimeout(fn, 5), clearTimeout },
     fetch: async (_url, { signal }) => {
       calls++;
@@ -363,7 +357,7 @@ test("A lookup timeout aborts the request and allows another attempt", async () 
 });
 
 test("Bilibili titles use room metadata and normalize whitespace", async () => {
-  const context = loadDashboard({ fetch: async (input, options) => {
+  const context = loadSources({ fetch: async (input, options) => {
     const url = new URL(input);
     assert.equal(url.pathname, "/room/v1/Room/get_info");
     assert.equal(url.searchParams.get("room_id"), "7734200");
@@ -381,17 +375,17 @@ test("Bilibili metadata rejects failures, missing titles and titles for another 
     { code: 0, data: { room_id: 7734200, title: { invalid: true } } },
     { code: 0, data: { room_id: 35, title: "Wrong room" } }
   ]) {
-    const context = loadDashboard({ fetch: async () => ({ ok: true, json: async () => payload }) });
+    const context = loadSources({ fetch: async () => ({ ok: true, json: async () => payload }) });
     await assert.rejects(context.fetchBilibiliLiveTitle("7734200"));
   }
-  const context = loadDashboard({ fetch: async () => ({ ok: false }) });
+  const context = loadSources({ fetch: async () => ({ ok: false }) });
   await assert.rejects(context.fetchBilibiliLiveTitle("7734200"));
 });
 
 test("Bilibili title lookups abort on timeout and fetch a fresh title on retry", async () => {
   let calls = 0;
   let aborted = false;
-  const context = loadDashboard({
+  const context = loadSources({
     window: { setTimeout: (fn) => setTimeout(fn, 5), clearTimeout },
     fetch: async (_url, { signal }) => {
       if (++calls > 1) return { ok: true, json: async () => ({ code: 0, data: { room_id: 7734200, title: `Title ${calls}` } }) };
