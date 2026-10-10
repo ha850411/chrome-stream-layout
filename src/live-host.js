@@ -69,8 +69,9 @@ function createLiveFrame(tile, sourceUrl) {
     updateLiveContext(frame);
     api.bind({
       activity: () => {
-        globalThis.showViewTools?.();
+        syncViewToolsWithPlayer(frame, true, true);
       },
+      controlsVisible: (visible) => syncViewToolsWithPlayer(frame, visible),
       edit: () => {
         if (frame.isConnected) openControls(Number(tile.dataset.tile));
       },
@@ -116,6 +117,7 @@ function disposeLiveFrames(tile) {
     window.clearTimeout(host?.preferenceTimer);
     if (host?.preferenceTimer) void persistState(t("saved"));
     host?.finish(null);
+    syncViewToolsWithPlayer(frame, false);
     host?.api?.destroy();
     clearFrameLoadTimer(frame);
     frame.remove();

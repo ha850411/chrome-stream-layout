@@ -93,7 +93,10 @@ module.exports = async function checkKickSoop(page) {
   // Establish a pointer transition in the new frame before checking leave;
   // the previous platform checks may leave the pointer at the same coordinate.
   await reveal(); await leave(); await waitToolbar(false);
-  await reveal(); await waitToolbar(true); await waitToolbar(false);
+  await reveal(); await waitToolbar(true);
+  assert.equal(await page.locator('#viewTools').evaluate(el => el.classList.contains('is-visible')), true, 'dashboard controls reveal with the player');
+  await waitToolbar(false);
+  assert.equal(await page.locator('#viewTools').evaluate(el => el.classList.contains('is-visible')), false, 'dashboard controls share the player idle dismissal');
   await live().focus(); await waitToolbar(true);
   await body().evaluate(() => document.activeElement.blur()); await waitToolbar(false);
   await reveal(); await waitToolbar(true);
@@ -101,6 +104,7 @@ module.exports = async function checkKickSoop(page) {
   await reveal(); await play().hover();
   await page.waitForTimeout(2400);
   await waitToolbar(true);
+  assert.equal(await page.locator('#viewTools').evaluate(el => el.classList.contains('is-visible')), true, 'hovering the player controls keeps dashboard controls visible too');
   await leave(); await waitToolbar(false);
   await kick().locator('#player').focus(); await page.keyboard.press('Tab');
   assert.equal(await body().evaluate(() => document.activeElement.id), 'centerPlay');

@@ -4,6 +4,7 @@
 const VIEW_TOOLS_IDLE_DELAY_MS = 1000;
 const VIEW_TOOLS_LEAVE_DELAY_MS = 300;
 let viewToolsTimer = 0;
+let viewToolsPlayer = null;
 let paneHighlightTimer = 0;
 let sourceMenuResult = null;
 let sourceMenuRevision = 0;
@@ -81,14 +82,31 @@ function bindLanguageMenu() {
 }
 
 function showViewTools(delay = VIEW_TOOLS_IDLE_DELAY_MS) {
+  viewToolsPlayer = null;
   const tools = document.querySelector("#viewTools");
   if (!tools || tools.hidden) return;
   window.clearTimeout(viewToolsTimer);
-  tools.classList.add("is-visible");
+  if (!tools.classList.contains("is-visible")) tools.classList.add("is-visible");
   viewToolsTimer = window.setTimeout(() => {
     const keyboardFocus = tools.contains(document.activeElement) && document.activeElement.matches(":focus-visible");
     if (!tools.matches(":hover") && !keyboardFocus) tools.classList.remove("is-visible");
   }, delay);
+}
+
+function syncViewToolsWithPlayer(frame, visible, activity = false) {
+  if (visible && !frame.isConnected) return;
+  if (visible && activity) viewToolsPlayer = frame;
+  if (viewToolsPlayer !== frame) return;
+  if (!visible) {
+    viewToolsPlayer = null;
+    hideViewTools(0);
+    return;
+  }
+  const tools = document.querySelector("#viewTools");
+  if (!tools || tools.hidden) return;
+  // The active player's hover, focus, menus and idle timer own this visibility.
+  window.clearTimeout(viewToolsTimer);
+  if (!tools.classList.contains("is-visible")) tools.classList.add("is-visible");
 }
 
 function hideViewTools(delay = VIEW_TOOLS_LEAVE_DELAY_MS) {
@@ -119,11 +137,10 @@ function bindViewingControls() {
   tools.addEventListener("focusin", () => showViewTools());
   tools.addEventListener("focusout", () => hideViewTools(200));
 
-  for (const name of ["pointermove", "pointerenter"]) {
+  for (const name of ["pointermove", "pointerenter", "pointerdown"]) {
     document.addEventListener(name, () => showViewTools(), { passive: true });
     stage.addEventListener(name, () => showViewTools(), { passive: true });
   }
-  stage.addEventListener("pointerdown", () => hideViewTools(0), { passive: true });
   document.querySelector("#openControlsButton").addEventListener("click", () => openControls());
   document.querySelector("#viewFullscreenButton").addEventListener("click", toggleFullscreen);
   stage.addEventListener("click", (event) => {
@@ -146,7 +163,6 @@ function bindViewingControls() {
       if (card && !card.contains(event.relatedTarget)) clearPaneHighlight();
     });
   }
-  showViewTools();
 }
 
 async function consumeSourceMenuResult() {

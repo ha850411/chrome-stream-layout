@@ -13,6 +13,10 @@ module.exports = async function checkViewingControls(page) {
   // Hovering anywhere over panes immediately reveals viewing controls
   await page.mouse.move(100, 100);
   await page.waitForFunction(() => document.querySelector("#viewTools").classList.contains("is-visible"));
+  assert.equal(await page.locator(".view-tools-bar").evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    return Math.abs(rect.x + rect.width / 2 - innerWidth / 2) < 1;
+  }), true, "global controls stay centered, clear of the top-right pane's controls");
   await page.locator("#openControlsButton").focus();
   await page.keyboard.press("Enter");
   assert.equal(await page.locator("#controlOverlay").isVisible(), true);
@@ -29,7 +33,11 @@ module.exports = async function checkViewingControls(page) {
   await page.locator("#dialogFullscreenButton").click();
   await page.waitForFunction(() => !document.fullscreenElement);
   await page.keyboard.press("Escape");
+  // Escape restores toolbar focus; move focus and the pointer away before checking idle dismissal.
+  await page.locator('[data-splitter="col"]').focus();
+  await page.mouse.move(100, 100);
   await page.waitForFunction(() => !document.querySelector("#viewTools").classList.contains("is-visible"));
+  assert.equal(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, 4)?.closest("#viewTools") === null), true, "hidden controls do not intercept the player or splitter underneath");
   console.log("PASS: viewing tools reveal on hover/focus, restore focus, auto-hide on idle, and open settings during fullscreen");
 
   await page.locator('[data-tile="1"] [data-source-action="edit"]').click();

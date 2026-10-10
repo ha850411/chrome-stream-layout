@@ -237,11 +237,16 @@ module.exports = async function checkSourceControls(page) {
   for (const axis of ["col", "row"]) {
     const splitter = page.locator(`[data-splitter="${axis}"]`);
     const rect = await splitter.boundingBox();
-    assert.equal(axis === "col" ? rect.width : rect.height, 15);
+    assert.ok((axis === "col" ? rect.width : rect.height) >= 32, "splitters react before the pointer reaches the divider");
     const start = axis === "col" ? { x: rect.x + 2, y: 80 } : { x: 80, y: rect.y + 2 };
     assert.equal(await page.evaluate(({ x, y, axis }) => document.elementFromPoint(x, y)?.dataset.splitter === axis, { ...start, axis }), true);
     const before = Number(await splitter.getAttribute("aria-valuenow"));
     await page.mouse.move(start.x, start.y);
+    await splitter.evaluate(async el => { await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished)); });
+    assert.equal(await splitter.evaluate((el, axis) => {
+      const hint = getComputedStyle(el, "::after");
+      return hint.opacity === "1" && parseFloat(axis === "col" ? hint.width : hint.height) >= 4;
+    }, axis), true, "approaching a divider reveals a thick guide before dragging");
     await page.mouse.down();
     await page.mouse.move(start.x + (axis === "col" ? 40 : 0), start.y + (axis === "row" ? 40 : 0));
     await page.mouse.up();

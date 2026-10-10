@@ -91,7 +91,11 @@
       </button>
       <button id="live" class="live-button" type="button" disabled><span class="live-dot" aria-hidden="true"></span>LIVE</button>
       <div id="playerOptions" class="player-options glass-surface">
-        <label class="volume-option"><span id="volumeLabel">音量</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1" disabled><span class="audio-wave" aria-hidden="true"><span class="bar bar-1"></span><span class="bar bar-2"></span><span class="bar bar-3"></span></span></label>
+        <label class="volume-option">
+          <span id="volumeLabel">音量</span>
+          <input id="volume" type="range" min="0" max="1" step="0.05" value="1" disabled>
+          <span id="volumeValue" class="volume-value" aria-hidden="true">100%</span>
+        </label>
         <div class="quality-option">
           <span id="qualityLabel">畫質</span>
           <button id="quality" type="button" value="auto" aria-haspopup="menu" aria-expanded="false" aria-controls="qualityMenu" disabled>

@@ -192,13 +192,13 @@ button {
   pointer-events: none;
 }
 
-.view-tools { position: fixed; top: 0; right: 12px; z-index: 20; width: 230px; max-width: calc(100vw - 24px); height: 12px; }
+.view-tools { position: fixed; top: 0; left: 50%; z-index: 20; width: max-content; max-width: calc(100vw - 24px); height: 12px; transform: translateX(-50%); pointer-events: none; }
 .view-tools-bar { 
   display: flex; 
   gap: 4px; 
   align-items: center; 
   width: fit-content; 
-  margin-left: auto; 
+  margin-inline: auto;
   padding: 4px 6px; 
   border: 1px solid rgba(255, 255, 255, 0.18); 
   border-radius: 16px; 
@@ -355,20 +355,24 @@ button {
   content: "";
   position: absolute;
   border-radius: 999px;
-  background: rgba(247, 244, 234, 0.28);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.35), 0 0 14px rgba(167, 139, 250, 0.3);
+  pointer-events: none;
   opacity: 0;
   transition: opacity 120ms ease, background 120ms ease;
 }
+
+:where(.stage:has(.splitter:hover)) .splitter::after { opacity: .45; }
 
 .splitter:hover::after,
 .splitter:focus-visible::after,
 body.is-resizing .splitter::after {
   opacity: 1;
-  background: var(--accent);
+  background: var(--accent-strong);
 }
 
 .splitter-col {
-  width: 15px;
+  width: 36px;
   left: 50%;
   transform: translateX(-50%);
   background: transparent;
@@ -376,14 +380,14 @@ body.is-resizing .splitter::after {
 }
 
 .splitter-col::after {
-  top: calc(50% - 34px);
-  left: calc(50% - 0.5px);
-  width: 1px;
-  height: 68px;
+  top: 0;
+  left: calc(50% - 3px);
+  width: 6px;
+  height: 100%;
 }
 
 .splitter-row {
-  height: 15px;
+  height: 36px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
@@ -391,13 +395,13 @@ body.is-resizing .splitter::after {
 }
 
 .splitter-row::after {
-  top: calc(50% - 0.5px);
-  left: calc(50% - 34px);
-  width: 68px;
-  height: 1px;
+  top: calc(50% - 3px);
+  left: 0;
+  width: 100%;
+  height: 6px;
 }
 
-.splitter-feedback { position: absolute; top: 50%; left: 50%; display: grid; gap: 3px; width: max-content; max-width: calc(100vw - 24px); padding: 8px 12px; border: 1px solid #52786f; border-radius: 8px; background: #142823f5; color: var(--accent-strong); transform: translate(-50%, -50%); opacity: 0; pointer-events: none; font-family: inherit; }
+.splitter-feedback { position: absolute; z-index: 1; top: 50%; left: 50%; display: grid; gap: 3px; width: max-content; max-width: calc(100vw - 24px); padding: 8px 12px; border: 1px solid #52786f; border-radius: 8px; background: #142823f5; color: var(--accent-strong); transform: translate(-50%, -50%); opacity: 0; pointer-events: none; font-family: inherit; }
 .splitter-feedback strong { font-size: 13px; font-variant-numeric: tabular-nums; }
 .splitter-feedback small { font-size: 11px; font-weight: 400; color: #c1d1ca; }
 .splitter:is(:hover, :focus-visible, .is-dragging) { z-index: 14; }

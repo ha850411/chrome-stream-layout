@@ -94,7 +94,8 @@ module.exports = async function checkTwitch(page) {
     assert.equal(await swapped.locator("#platform").textContent(), "Twitch");
     assert.equal(await swapped.locator("#player").getAttribute("aria-label"), "Pane 2");
     assert.equal(await page.locator('[data-tile="1"] iframe').getAttribute("title"), null);
-    await swapped.locator("#video").hover({ position: { x: 20, y: 20 } });
+    // Enter below the global toolbar, which now sits over the top-center divider.
+    await swapped.locator("#video").hover({ position: { x: 40, y: 80 } });
     await swapped.locator("#play").click(); await waitStatus("sourcePaused", 1);
     assert.equal(await page.locator('[data-tile="0"]').getAttribute("data-status"), "sourcePlaying");
     await page.evaluate(() => swapSourceSlots(1, 0));

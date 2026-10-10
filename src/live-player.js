@@ -9,6 +9,7 @@ const playButton = document.querySelector("#play");
 const centerPlayButton = document.querySelector("#centerPlay");
 const muteButton = document.querySelector("#mute");
 const volume = document.querySelector("#volume");
+const volumeValue = document.querySelector("#volumeValue");
 const liveButton = document.querySelector("#live");
 const quality = document.querySelector("#quality");
 const qualityValue = document.querySelector("#qualityValue");
@@ -17,6 +18,7 @@ const fullscreenButton = document.querySelector("#fullscreen");
 const moreButton = document.querySelector("#more");
 const playerOptions = document.querySelector("#playerOptions");
 const errorActions = document.querySelector("#errorActions");
+const CONTROLS_IDLE_DELAY_MS = 1000;
 const compactControls = window.matchMedia("(max-width: 380px)");
 let optionsOpen = false;
 let qualityMenuOpen = false;
@@ -48,7 +50,10 @@ const label = (element, value) => { element.title = value; element.setAttribute(
 function hideControls() {
   window.clearTimeout(idleTimer);
   idleTimer = 0;
-  surface.classList.remove("player-controls-visible");
+  if (surface.classList.contains("player-controls-visible")) {
+    surface.classList.remove("player-controls-visible");
+    callbacks.controlsVisible?.(false);
+  }
 }
 function setPlayerOptions(open, returnFocus = false) {
   if (!open) setQualityMenu(false);
@@ -117,9 +122,12 @@ function checkIdle() {
 }
 function showControls() {
   // Pointer movement only extends the deadline once the controls are visible.
-  if (!surface.classList.contains("player-controls-visible")) surface.classList.add("player-controls-visible");
-  idleDeadline = performance.now() + 2200;
-  if (!idleTimer) idleTimer = window.setTimeout(checkIdle, 2200);
+  if (!surface.classList.contains("player-controls-visible")) {
+    surface.classList.add("player-controls-visible");
+    callbacks.controlsVisible?.(true);
+  }
+  idleDeadline = performance.now() + CONTROLS_IDLE_DELAY_MS;
+  if (!idleTimer) idleTimer = window.setTimeout(checkIdle, CONTROLS_IDLE_DELAY_MS);
 }
 function syncControls() {
   if (!labels) return;
@@ -142,8 +150,11 @@ function syncControls() {
     }
   }
   surface.classList.toggle("has-audio", !muted && playbackStatus === "sourcePlaying");
+  const volumePercent = `${Math.round(video.volume * 100)}%`;
   volume.value = String(video.volume);
-  volume.style.setProperty("--volume-fill", `${Math.round(video.volume * 100)}%`);
+  volume.style.setProperty("--volume-fill", volumePercent);
+  volume.setAttribute("aria-valuetext", volumePercent);
+  volumeValue.textContent = volumePercent;
   label(fullscreenButton, document.fullscreenElement ? labels.exit : labels.fullscreen);
   document.querySelector("#fullscreenLabel").textContent = document.fullscreenElement ? labels.exit : labels.fullscreen;
   liveButton.classList.toggle("is-live", playbackStatus === "sourcePlaying");
@@ -207,7 +218,7 @@ async function toggleFullscreen() {
     else await surface.requestFullscreen();
   } catch { /* Controls remain usable if the browser declines fullscreen. */ }
 }
-for (const type of ["pointerenter", "pointermove", "pointerdown", "focusin"]) {
+for (const type of ["pointerenter", "pointermove", "pointerdown", "focusin", "keydown"]) {
   on(surface, type, () => {
     showControls();
     callbacks.activity?.();
@@ -350,7 +361,7 @@ window.livePlayer = {
     platform.textContent = { twitch: "Twitch", kick: "Kick" }[value.platform] || "";
     platform.dataset.platform = value.platform || "";
     label(liveButton, value.liveTitle);
-    label(volume, labels.volume);
+    volume.setAttribute("aria-label", labels.volume);
     label(moreButton, labels.more);
     playerOptions.setAttribute("aria-label", labels.more);
     document.querySelector("#volumeLabel").textContent = labels.volume;
